@@ -4,4 +4,4 @@ This repository contains R code for an Agent-based Model (ABM) that is used to s
 
 Script: This folder contains script to run the ABM (including the sensitivity analysis) and the analyses.
 
-Data: This folder contains the data from the ABM.
+Output: This folder contains the output from the ABM.
