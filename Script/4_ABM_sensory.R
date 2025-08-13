@@ -8,7 +8,7 @@ library(truncnorm)
 library(compiler)     
 library(future.apply) 
 
-setwd("/home/picocluster/Documents/ABM")  # Set working directory
+setwd("/home/Documents/ABM")  # Set working directory
 source("Functions.R")  # Load external functions
 
 plan(multicore, workers = 6)  # Enable parallel processing with 6 workers
@@ -206,3 +206,4 @@ for (z in 1:total_combinations) {
   # Save results to CSV
   write.csv(output, file = paste0("Output/output_sensory_hetero", z, ".csv"))
 }
+
