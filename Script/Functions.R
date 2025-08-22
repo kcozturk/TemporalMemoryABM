@@ -15,7 +15,7 @@ random_movement <- function(x_prev, y_prev, x_curr, y_curr, stepmean, stepsd, wr
   } else {
     # Directional movement with wrapped normal noise
     noise <- as.vector(rwrappednormal(1, mu = circular(0), rho = wrap_rho, control.circular = list(units = "degrees")))
-    angle_movement <- prev_angle + noise
+    angle_movement <- prev_angle + noise %% 360
   }
   
   # Compute movement distance
@@ -28,7 +28,7 @@ random_movement <- function(x_prev, y_prev, x_curr, y_curr, stepmean, stepsd, wr
   return(list(x_move = x_move, y_move = y_move, angle_movement = angle_movement, distance = movement_distance))
 }
 
-##### Function: random_movement() #####
+##### Function: move_2target() #####
 # Moves an agent towards a target location with a maximum step length
 move_2target <- function(agent_x, agent_y, target_x, target_y, max_step) {
   # Compute the distance to the target
@@ -50,28 +50,210 @@ move_2target <- function(agent_x, agent_y, target_x, target_y, max_step) {
 }
 
 
+###### Function: collision() ######
+# This function detects collision point between agent random movement and boudaries.
+# The function is used within the function refl_boundary()
+collision <- function(prim_x, prim_y, angle_degrees, step, xmin, xmax, ymin, ymax) {
+  
+  angle_rad <- angle_degrees * pi / 180
+  
+  dx <- sin(angle_rad)
+  dy <- cos(angle_rad)
+  
+  # Distances to each boundary
+  t_xmax <- if (dx > 0) (xmax - prim_x)/dx else Inf
+  t_xmin <- if (dx < 0) (xmin - prim_x)/dx else Inf
+  t_ymax <- if (dy > 0) (ymax - prim_y)/dy else Inf
+  t_ymin <- if (dy < 0) (ymin - prim_y)/dy else Inf
+  
+  t_candidates <- c(t_xmin, t_xmax, t_ymin, t_ymax)
+  t_hit <- min(t_candidates[t_candidates > 0 & is.finite(t_candidates)])
+  
+  x_hit <- prim_x + t_hit * dx
+  y_hit <- prim_y + t_hit * dy
+  
+  # Snap round-off errors onto the boundary
+  eps <- 1e-8
+  if (abs(x_hit - xmin) < eps) x_hit <- xmin
+  if (abs(x_hit - xmax) < eps) x_hit <- xmax
+  if (abs(y_hit - ymin) < eps) y_hit <- ymin
+  if (abs(y_hit - ymax) < eps) y_hit <- ymax
+  
+  remaining <- step - t_hit
+  
+  return(list(
+    col_x = x_hit,
+    col_y = y_hit,
+    remaining = remaining
+  ))
+}
+
+
+
+
+
+###### Function: safe_angle_segment() ######
+# This function detects safe angles that can be taken from collision point, 
+# that do not go outside of boundaries.
+# The function is used within the function refl_boundary() to then draw a random angle.
+safe_angle_segment <- function(col_x, col_y, remaining, xmin, xmax, ymin, ymax) {
+  
+  # Compute max/min angles allowed to stay within rectangle
+  # Angles in radians (0 = up, pi/2 = right, etc.)
+  
+  # Left/right limits
+  if (remaining <= 0) stop(paste("Remaining step must be positive, remaining value is:", remaining, 
+                                 "col_x:", col_x, "col_y:", col_y))
+  
+  # Exactly in the corner
+  if (col_x == xmax && col_y == ymax) {
+    angle_min <- 180
+    angle_max <- 270
+  } else if (col_x == xmin && col_y == ymin) {
+    angle_min <- 0
+    angle_max <- 90
+  } else if (col_x == xmax && col_y == ymin) {
+    angle_min <- 270
+    angle_max <- 360
+  } else if (col_x == xmin && col_y == ymax) {
+    angle_min <- 90
+    angle_max <- 180
+  } else if (col_x == xmin || col_x == xmax) { # For circle with center of collision, determine intersection with the two adjacent walls
+    intsct_top <- pcds::intersect.line.circle(c(xmin, ymax), c(xmax, ymax), c(col_x, col_y), remaining)
+    a1 <- ifelse(
+      !is.null(intsct_top),
+      {
+        intsct_top <- abs(matrix(intsct_top, ncol = 2))  
+        idx <- which.min(intsct_top[, 1])
+        anglefun(
+          intsct_top[idx, 1],
+          intsct_top[idx, 2],
+          col_x, col_y
+        )
+      },
+      360 # value/degree if there is no intersection
+    )
+    
+    intsct_bot <- pcds::intersect.line.circle(c(xmin, ymin), c(xmax, ymin), c(col_x, col_y), remaining)
+    a2 <- ifelse(
+      !is.null(intsct_bot),
+      {
+        intsct_bot <- abs(matrix(intsct_bot, ncol = 2))
+        idx <- which.min(intsct_bot[, 1])
+        anglefun(
+          intsct_bot[idx, 1],
+          intsct_bot[idx, 2],
+          col_x, col_y
+        )
+      },
+      180 # value/degree if there is no intersection
+    )
+    
+    if (col_x == xmin) {
+      angle_min <- a1
+      angle_max <- a2
+    } else {
+      angle_min <- a2
+      angle_max <- a1
+    }
+    
+  } else if (col_y == ymin || col_y == ymax) {
+    intsct_left <- pcds::intersect.line.circle(c(xmin, ymin), c(xmin, ymax), c(col_x, col_y), remaining)
+    a1 <- ifelse(
+      !is.null(intsct_left),
+      {
+        intsct_left <- abs(matrix(intsct_left, ncol = 2))
+        idx <- which.min(intsct_left[, 2])
+        anglefun(
+          intsct_left[idx, 1],
+          intsct_left[idx, 2],
+          col_x, col_y
+        )
+      },
+      270 
+    )
+    
+    intsct_right <- pcds::intersect.line.circle(c(xmax, ymin), c(xmax, ymax), c(col_x, col_y), remaining)
+    a2 <- ifelse(
+      !is.null(intsct_right),
+      {
+        intsct_right <- abs(matrix(intsct_right, ncol = 2))  
+        idx <- which.min(intsct_right[, 2])
+        anglefun(
+          intsct_right[idx, 1],
+          intsct_right[idx, 2],
+          col_x, col_y
+        )
+      },
+      90 
+    )
+    if (col_y == ymin) {
+      angle_min <- a1
+      angle_max <- a2
+    } else {
+      angle_min <- a2
+      angle_max <- a1
+    }
+  } 
+  return(c(angle_min, angle_max))
+}
+
+
 ##### Function: refl_boundary() #####
 # Implements a reflecting boundary for agent movement.
-refl_boundary <- function(agent_position, xloc_index, yloc_index, x_move, y_move, x_min, x_max, y_min, y_max) {
+# If boundary is crossed it moves agent back by chosing a new angle from 
+# collisionpoint with boundary
+refl_boundary <- function(prim_x, prim_y, angle_deg, step, xmin, xmax, ymin, ymax) {
+  angle_rad <- angle_deg * pi/180
   
-  # Update x position with reflection
-  new_x <- agent_position[1, xloc_index] + x_move
-  if (new_x > x_max || new_x < x_min) {
-    agent_position[1, xloc_index] <- agent_position[1, xloc_index] - x_move  # Reflect
-  } else {
-    agent_position[1, xloc_index] <- new_x
+  # Compute first segment
+  x_new <- prim_x + step * sin(angle_rad)
+  y_new <- prim_y + step * cos(angle_rad)
+  
+  # If still inside, return directly
+  if (x_new >= xmin && x_new <= xmax && y_new >= ymin && y_new <= ymax) {
+    return(list(
+      final_x = x_new,
+      final_y = y_new,
+      seg1 = c(prim_x, prim_y, x_new, y_new),
+      seg2 = NULL,
+      new_angle_deg = NULL
+    ))
   }
   
-  # Update y position with reflection
-  new_y <- agent_position[1, yloc_index] + y_move
-  if (new_y > y_max || new_y < y_min) {
-    agent_position[1, yloc_index] <- agent_position[1, yloc_index] - y_move  # Reflect
+  # If on edge
+  if (prim_x == xmin || prim_x == xmax || prim_y == ymin || prim_y == ymax) {
+    col <- list(col_x = prim_x, col_y = prim_y, remaining = step)
   } else {
-    agent_position[1, yloc_index] <- new_y
+    # First collision
+    col <- collision(prim_x, prim_y, angle_deg, step, xmin, xmax, ymin, ymax)
   }
   
-  return(agent_position)
+  # Determine safe angle range
+  safe_range <- safe_angle_segment(col$col_x, col$col_y, col$remaining, xmin, xmax, ymin, ymax)
+  
+  # ensure that max degree is the larger value 
+  if (safe_range[2] < safe_range[1]) {
+    safe_range[2] <- safe_range[2] + 360
+  }
+  
+  # Pick new angle
+  new_angle <- runif(1, safe_range[1], safe_range[2])  %% 360 # adjust for the + 360
+  new_rad <- new_angle * pi / 180
+  
+  # Second segment end point
+  x_end <- col$col_x + col$remaining * sin(new_rad) 
+  y_end <- col$col_y + col$remaining * cos(new_rad)
+  
+  return(list(
+    final_x = x_end,
+    final_y = y_end,
+    seg1 = c(prim_x, prim_y, col$col_x, col$col_y),
+    seg2 = c(col$col_x, col$col_y, x_end, y_end),
+    new_angle_deg = new_angle
+  ))
 }
+
 
 
 
@@ -85,11 +267,11 @@ distance <- function(x1, y1, x2, y2) {
 
 ##### Function: anglefun() #####
 # Computes the angle (in degrees) between two locations.
+# x1, and y1, are the locations that the agent ended at, and x2 and y2 where it came from
 anglefun <- function(x1, y1, x2, y2) {
-  temp_angle <- atan2(x1 - x2, y1 - y2) * (180 / pi)
-  ifelse(temp_angle < 0, temp_angle + 360, temp_angle)  # Convert negative angles to positive range
+  temp_angle <- (atan2(x1 - x2, y1 - y2) * (180 / pi)) %% 360
+  return(temp_angle)  # Convert negative angles to positive range
 }
-
 
 
 ##### Function: linedistances() #####
@@ -268,8 +450,11 @@ Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
                              fruit_dim_ripeness = 10,  
                              Tree_nr = 1) {
   
-  # Ensure food is not empty
-  if (is.null(food) || nrow(food) == 0) return(remembered)
+  # Determine empty memory spots
+  empty_slots <- which(remembered[, remembered_tree_no] == 0)
+  
+  # Ensure there is storage capacity left
+  if (length(empty_slots) == 0) return(remembered)
   
   # Identify trees NOT already in memory
   unseen_trees <- food[!food[, Tree_nr] %in% remembered[, remembered_tree_no], , drop = FALSE]
@@ -290,7 +475,7 @@ Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
     rep(prim_agent[1, yloc_agent], times = nrow(unripe_trees))
   )
   
-  # Calculate distances
+  # Calculate distances over movement path if agent had moved
   if (history[[timestep - 1]][1, xloc_agent] != prim_agent[1, xloc_agent] ||
       history[[timestep - 1]][1, yloc_agent] != prim_agent[1, yloc_agent]) {
     
@@ -306,6 +491,8 @@ Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
                ncol = 2, byrow = TRUE)
       )
     )
+    # remember that agent did move
+    moved <- 1
     
   } else {  
     # Compute distances from current location
@@ -314,6 +501,9 @@ Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
       mapply(distance, tree_locations[, 2], tree_locations[, 3],
              tree_locations[, 4], tree_locations[, 5])
     )
+    
+    # remember that agent did not move
+    moved <- 0
   }
   
   # Filter trees within the detection range
@@ -322,24 +512,47 @@ Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
   # Ensure there are trees within detection range
   if (is.null(distances) || nrow(distances) == 0) return(remembered)
   
-  # Identify the closest tree
-  closest_tree <- distances[which.min(distances[, 2]), ]
-  
-  # Ensure the tree is not already remembered & find an empty memory slot
-  empty_slot <- match(0, remembered[, remembered_tree_no], nomatch = FALSE)
-  
-  if (!is.na(empty_slot) && length(closest_tree) > 0) {
-    remembered[empty_slot, c(2:5, 7, 8, 11)] <- c(
-      closest_tree[1],  # Tree number
-      food[closest_tree[1][[1]], xloc_food],  # Tree X location
-      food[closest_tree[1][[1]], yloc_food],  # Tree Y location
+  # when there is enough storage capacity to store encountered unripe fruit-bearing trees. All of them are memorized
+  if (length(empty_slots) >= nrow(distances)) {
+    remembered[empty_slots[1:nrow(distances)], c(2:5, 7, 8, 11)] <- cbind(
+      distances[, 1],  # Tree number
+      food[distances[, 1], xloc_food],  # Tree X location
+      food[distances[, 1], yloc_food],  # Tree Y location
       time_to_forget,  # Forget time
-      remembered[empty_slot, 7] + 1,  # Memory count
-      scalarpropertyfun(food[closest_tree[1][[1]], fruit_dim_ripeness]),  # Estimated ripening time
-      food[closest_tree[1][[1]], fruit_unripe]  # Unripe fruit count
+      remembered[empty_slots[1:nrow(distances)], 7] + 1,  # Memory count
+      scalarpropertyfun(food[distances[, 1], fruit_dim_ripeness]),  # Estimated ripening time
+      food[distances[, 1], fruit_unripe]  # Unripe fruit count
     )
+    return(remembered)
+  } 
+  
+  if (moved == 1) { # if agent did move, the trees first encountered are memorized (i.e. furthest to the point of arrival)
+    
+    # distances to end point
+    dist_to_end <- apply(food[distances[, 1], 2:3, drop=FALSE], 1, function(row) {
+      distance(prim_agent[1, xloc_agent], prim_agent[1, yloc_agent], row[1], row[2])
+    })
+    
+    # order trees based on first encounted 
+    ordered_distances <- distances[order(dist_to_end, decreasing = T), ]  
+    ordered_distances <- ordered_distances[1:length(empty_slots), , drop = FALSE] # reduce to the number of empty slots
+    
+  } else { # if agent did not move, the trees closest to ripening are memorized
+    # order trees by ripening
+    ordered_distances <- distances[order(food[distances[, 1], fruit_dim_ripeness], decreasing = T), ]  
+    ordered_distances <- ordered_distances[1:length(empty_slots), , drop = FALSE] # reduce to the number of empty slots
   }
   
+  remembered[empty_slots[1:nrow(ordered_distances)], c(2:5, 7, 8, 11)] <- cbind(
+    ordered_distances[, 1],  # Tree number
+    food[ordered_distances[, 1], xloc_food],  # Tree X location
+    food[ordered_distances[, 1], yloc_food],  # Tree Y location
+    time_to_forget,  # Forget time
+    remembered[empty_slots[1:nrow(ordered_distances)], 7] + 1,  # Memory count
+    scalarpropertyfun(food[ordered_distances[, 1], fruit_dim_ripeness]),  # Estimated ripening time
+    food[ordered_distances[, 1], fruit_unripe]  # Unripe fruit count
+  )
+
   return(remembered)
 }
 
@@ -365,25 +578,25 @@ Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
 forgetting <- function(remembered, time_history, time, timestep,
                        tree_no = 2, forget_counter = 5, 
                        count_elapsed_ts = 12, est_elapsed_ts = 13, 
-                       inac_fact = inaccuracy_factor) {
-  
-  # Ensure remembered is not empty
-  if (is.null(remembered) || nrow(remembered) == 0) return(remembered)
-  
-  # Calculate elapsed time since last step
-  passed_time <- time - time_history[timestep]
+                       inac_fact = inaccuracy_factor,
+                       forgetting_rate = forgetting_rate) {
   
   # Identify filled memory slots
   memories <- remembered[, tree_no] > 0
   
+  # Ensure remembered is not empty
+  if (nrow(remembered) == 0 || sum(memories) == 0) return(remembered)
+  
+  # Calculate elapsed time since last step
+  passed_time <- time - time_history[timestep]
+  
   if (sum(memories) > 0) {
     # Estimate elapsed time
     est_passed_time <- sapply(which(memories), function(i) { new_rtruncnorm(1,
-                                                    a = -1 * remembered[i, est_elapsed_ts],
-                                                    b = Inf, mean = passed_time,
-                                                    sd = inac_fact)
-                                                    })
-
+                                                                            a = -1 * remembered[i, est_elapsed_ts],
+                                                                            b = Inf, mean = passed_time,
+                                                                            sd = inac_fact)})
+    
     # Update the agent's estimate of elapsed time with noise
     remembered[memories, est_elapsed_ts] <- remembered[memories, est_elapsed_ts] + est_passed_time
     
@@ -394,10 +607,20 @@ forgetting <- function(remembered, time_history, time, timestep,
     remembered[memories & remembered[, forget_counter] > 0, forget_counter] <- 
       remembered[memories & remembered[, forget_counter] > 0, forget_counter] - passed_time 
     
-    # Reset memory slots where forget counter reaches 0
-    reset_rows <- remembered[, forget_counter] <= 0
+    # Reset memory slots based on forgetting curve: simple power law)
+    # simple power law: R=t^(-b)
+    
+    values <- remembered[memories, count_elapsed_ts]
+    
+    # probability of retention of memory
+    probabilities <- values^(-forgetting_rate)
+    probabilities <- pmin(pmax(probabilities, 0), 1)  # keep in [0,1]
+    
+    retention <- rbinom(n = length(probabilities), size = 1, prob = probabilities)
+    
+    reset_rows <- retention == 0
     if (any(reset_rows)) {
-      remembered[reset_rows, c(2:6, 8, 10, 11:13)] <- matrix(
+      remembered[which(memories)[reset_rows], c(2:6, 8, 10, 11:13)] <- matrix(
         rep(c(0, 0, 0, 0, 0, 0, 10000, 0, 0, 0), times = sum(reset_rows)),
         ncol = 10, byrow = TRUE
       )
@@ -560,7 +783,7 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
                          eaten_col = 4, target = 6,  
                          counter_to_ripen_col = 8, wrap_rho = wrapped_rho,
                          count_elapsed_ts = 12, est_elapsed_ts = 13, memory = memoryused,
-                         targ_thres = target_threshold, rememb_index = 10) {
+                         rememb_index = 10, time_to_ripen = time_to_ripen, weight_time_dist = weight_time_dist) {
   
   # Initialize tracking variables
   memory_used <- F
@@ -601,7 +824,7 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
       # The fruit that is eaten is counted for the agent
       prim_agent[1, eaten_col] <- prim_agent[1, eaten_col] + 1
       
-      return(list(prim_agent, food, remembered))
+      return(list(prim_agent, food, remembered, moved = 0))
       
     } else if (closesttree_ripe[2] < visdet) {
       
@@ -610,7 +833,11 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
       prim_agent[1, yloc_agent] <- food[closesttree_ripe[1], yloc_food]
       prim_agent[1, xloc_agent] <- food[closesttree_ripe[1], xloc_food]
       
-      return(list(prim_agent, food, remembered))
+      # Calculate movement distance from previous timestep
+      moved <- distance(prim_agent[1, xloc_agent], prim_agent[1, yloc_agent],
+                        food[closesttree_ripe[1], xloc_food], food[closesttree_ripe[1], yloc_food])
+        
+      return(list(prim_agent, food, remembered, moved))
     }
   }
   
@@ -618,7 +845,7 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
   # Determining index and targeting remembered trees
   if (memory == T && sum(remembered[, 2]) > 0) { 
     
-    # If no food is targeted and if there are memories
+    # If no food is targeted yet
     if (sum(remembered[, target]) == 0) {
       
       # Non-empty memory slots get assigned the index value, which is: time to ripen - estimated elapsed time 
@@ -634,14 +861,33 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
                MoreArgs = list(prim_x, prim_y))
       )
       
-      # Vector for trees if tree is not visible   
-      trees_outofsight <- which((distances_remembered > visdet))
+      # index vector for out of sight trees
+      trees_outofsight <- (distances_remembered > visdet) & valid_memory 
       
       if (length(trees_outofsight) > 0) {
         
-        # Determine for trees_outofsight with lowest index whether it should be targeted
-        nr_lowest <- remembered[trees_outofsight, 1][which.min(remembered[trees_outofsight, rememb_index])] 
-        remembered[nr_lowest, target] <- targeting(remembered[nr_lowest, rememb_index])
+        # Determine for trees_outofsight which has the lowest index (based on distance and ripening), 
+        # for that tree is decides whether to target it or not
+        minTime <- 0
+        maxTime <- time_to_ripen 
+        minDist <- visdet
+        maxDist <- sqrt((xmax^2) + (ymax^2)) # longest possible distance in the environment
+        
+        # Time and distance scaled based on min/max
+        scaled_time <- (remembered[trees_outofsight, rememb_index] - minTime) / (maxTime - minTime)
+        scaled_dist <- (distances_remembered[trees_outofsight] - minDist) / (maxDist - minDist)
+        
+        wTime <- weight_time_dist / (weight_time_dist + 1)
+        wDist <- 1 / (weight_time_dist + 1)
+        
+        # Get indices of the subset in the full dataframe
+        subset_idx <- which(trees_outofsight)
+        
+        # Pick the absolute index of the best tree
+        shortlist <- subset_idx[which.min(wTime * scaled_time + wDist * scaled_dist)]
+        
+        # Update target
+        remembered[shortlist, target] <- targeting(remembered[shortlist, rememb_index])
       }
     }
     
@@ -660,12 +906,22 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
                                                                  remembered[nr_target, remembered_tree_x],
                                                                  remembered[nr_target, remembered_tree_y],
                                                                  rnorm(1, mean = stepmean, sd = stepsd))
+        angle_move <- anglefun(prim_agent[1, xloc_agent],
+                               prim_agent[1, yloc_agent],
+                               prim_x, prim_y)
+        dist_move <- distance(prim_agent[1, xloc_agent],
+                              prim_agent[1, yloc_agent],
+                              prim_x, prim_y)
+        
         memory_used <- T 
       }
     }
   }
+
   
   #  ========= RANDOM MOVEMENT ========== 
+  prim_agent_refl <- NULL
+  
   if (!memory_used) {                                
     move <- random_movement(history[[timestep - 1]][1,xloc_agent], 
                             history[[timestep - 1]][1,yloc_agent],
@@ -674,35 +930,67 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
     x_move <- move$x_move
     y_move <- move$y_move
     
-    # Add the reflecting boundary
-    prim_agent <- refl_boundary(prim_agent, xloc_agent, yloc_agent, x_move, y_move, xmin, xmax, ymin, ymax)
+    angle_move <- move$angle_movement 
+    dist_move <- move$distance
+    
+    # Add the reflecting boundary  
+    prim_agent_refl <- refl_boundary(prim_x, prim_y, angle_move, 
+                                     step = dist_move, 
+                                     xmin = xmin, xmax = xmax, 
+                                     ymin = ymin, ymax = ymax)
+
+    prim_agent[1, c(xloc_agent, yloc_agent)] <- c(prim_agent_refl[[1]], prim_agent_refl[[2]])
     
   }
   
   
   #  ========= Perceptual range over moved line  ==========
-  # When the agent moved randomly or used moved with memory 
+  # When the agent moved randomly or moved with memory 
   # and if there was ripe fruits to potentially see, check perceptual range
-  if (nrow(treelocations_ripe) > 0) {   
+  encountered <- NULL
+  encountered2 <- NULL
+  
+  if (nrow(treelocations_ripe) > 0) {
+    # Determine if trees with ripe fruit are encountered on path and which one first
+    encountered <- path_encounter(prim_x, prim_y, 
+                                  angle_move, dist_move, 
+                                  matrix(treelocations_ripe[, 2:3], ncol = 2), visdet)
     
-    # Determine distances from tree with ripe fruit to the moved line of the agent
-    distances <- linedistances(matrix(treelocations_ripe[, 2:3], ncol = 2),
-                               matrix(c(prim_x, prim_y,
-                                        prim_agent[1, xloc_agent],
-                                        prim_agent[1, yloc_agent]), ncol=2, byrow = TRUE))
-    
-    # If any of the Trees with ripe fruit in perceptual range, 
-    # adjust loc. of the agent to loc. of the ripe tree that is closest to start point
-    if (any(distances <= visdet)) { 
-      dist_start <- apply(treelocations_ripe[, 2:3, drop=FALSE], 1, function(row) {
-        distance(prim_x, prim_y, row[1], row[2])
-      })
+    # If reflective boundary was used and there was nothing at first segment:
+    if (length(encountered) == 0 && length(prim_agent_refl[[4]]) != 0) {    
       
-      prim_agent[1, xloc_agent:yloc_agent] <- treelocations_ripe[which.min(dist_start), 2:3, drop=FALSE]  
+        # Determine if trees with ripe fruit are encountered on second segment of path (after reflection)
+        encountered2 <- path_encounter(prim_agent_refl[[4]][1], prim_agent_refl[[4]][2], 
+                                      prim_agent_refl[[5]], 
+                                       distance(prim_agent_refl[[4]][1], 
+                                                prim_agent_refl[[4]][2], 
+                                                prim_agent_refl[[4]][3], 
+                                                prim_agent_refl[[4]][4]), 
+                                       matrix(treelocations_ripe[, 2:3], ncol = 2), visdet)
     }
   }
+
+  # Adjust location of agent if a tree was encountered across the CRW, 
+  # determine moved distance.
+  if (length(encountered) > 0) { 
+    prim_agent[1, xloc_agent:yloc_agent] <- treelocations_ripe[encountered[[1]], 2:3, drop=FALSE]  
+    moved <- encountered[[2]] + encountered[[4]] # moved distance
+    
+    } else if (length(prim_agent_refl[[4]]) != 0 && length(encountered2) > 0) { 
+      prim_agent[1, xloc_agent:yloc_agent] <- treelocations_ripe[encountered2[[1]], 2:3, drop=FALSE]  
+      moved1 <- distance(prim_agent_refl[[3]][1], 
+                         prim_agent_refl[[3]][2], 
+                         prim_agent_refl[[3]][3], 
+                         prim_agent_refl[[3]][4]) # moved distance along first segment
+      moved2 <- encountered2[[2]] + encountered2[[4]] # moved distance along second segment
+      moved <- moved1 + moved2
+    } else {
+    # Calculate movement distance from previous timestep
+    moved <- distance(prim_x, prim_y, prim_agent[1, xloc_agent], prim_agent[1, yloc_agent])
+  }
   
-  return(list(prim_agent, food, remembered))                                                                    
+  
+  return(list(prim_agent, food, remembered, moved))                                                                    
 }
 
 
@@ -746,33 +1034,22 @@ scalarpropertyfun <- function(y_value,
 # - Eats food at a rate of eatrate: food items/t (arbitrary food items per time unit).
 #
 # Arguments:
-# - prim_agent:   Current agent state (position).
-# - history:      List tracking previous positions.
-# - timestep:     Current time step in the model.
+# - moved:        Moved distance of agent
 # - time:         Current time value.
-# - xloc_agent:   Column index for the agent's x-coordinate (default: 2).
-# - yloc_agent:   Column index for the agent's y-coordinate (default: 3).
-# - movingspeed:  Speed of movement (default: movspeed).
-# - eatingspeed:  Eating eatspeed (default: eatspeed).
+# - movspeed:     Speed of movement.
+# - eatrate:      Eating rate.
 #
 # Returns:
 # - Updated time value.
 
-timepassage <- function(prim_agent, history, timestep, time, 
-                        xloc_agent = 2, yloc_agent = 3, 
-                        movingspeed = movspeed, eatingspeed = eatrate) {
-  
-  # Calculate movement distance from previous timestep
-  moved <- distance(
-    history[[timestep]][1, xloc_agent], history[[timestep]][1, yloc_agent], 
-    prim_agent[1, xloc_agent], prim_agent[1, yloc_agent]
-  )
+timepassage <- function(moved, time,
+                        movspeed = movspeed, eatrate = eatrate) {
   
   # Update time based on movement or eating action
   if (moved > 0) {
-    time <- time + (moved / movingspeed)
+    time <- time + (moved / movspeed)
   } else {
-    time <- time + (1 / eatingspeed)  # If no movement, assume eating occurred
+    time <- time + (1 / eatrate)  # If no movement, eating occurred
   }
   
   return(time)
@@ -785,9 +1062,8 @@ timepassage <- function(prim_agent, history, timestep, time,
 # Corrects movement or eating of an agent after the maximum allowed time.
 # 
 # Description:
-# This function ensures that an agent does not move or eat beyond a predefined maximum time (`tmax`).  
+# This function ensures that an agent does not eat beyond a predefined maximum time (`tmax`).  
 # If the agent has eaten beyond `tmax`, the consumed fruit is restored.  
-# If the agent has moved beyond `tmax`, it is repositioned back to its correct location.
 #
 # Arguments:
 # - prim_agent      : Matrix representing the primary agent's state.
@@ -824,25 +1100,7 @@ timecap <- function(prim_agent, history, food, foodhistory, timestep, time,
     # Restore the fruit since it was eaten after tmax
     food[eaten_food, fruit_col_prim] <- food[eaten_food, fruit_col_prim] + 1
     
-  } else {
-    # Calculate the time exceeded after tmax
-    passed_time <- time - tmax
-    movement_distance <- movingspeed * passed_time
-    
-    # Compute movement angle
-    angle_movement <- anglefun(
-      prim_agent[1, xloc_agent], prim_agent[1, yloc_agent],
-      history[[timestep]][1, xloc_agent], history[[timestep]][1, yloc_agent]
-    )
-    
-    # Compute new x and y displacement
-    x_move <- sin(angle_movement * pi / 180) * movement_distance
-    y_move <- cos(angle_movement * pi / 180) * movement_distance
-    
-    # Adjust agent's location
-    prim_agent[1, xloc_agent] <- prim_agent[1, xloc_agent] + x_move
-    prim_agent[1, yloc_agent] <- prim_agent[1, yloc_agent] + y_move
-  }
+  } 
   
   # Set time to max allowable time
   time <- tmax
@@ -870,7 +1128,7 @@ timecap <- function(prim_agent, history, food, foodhistory, timestep, time,
 #
 # The initialized parameters are set globally and can be accessed
 # throughout the simulation. 
-initialize_env_agent <- function() {
+initialize_env_agent <- function(nTree = nTree) {
   
   #### Environmental parameters ####
   # Initialize input values for parameters
@@ -885,9 +1143,12 @@ initialize_env_agent <- function() {
   
   #### Primate parameters ####
   # Initialize input values for parameters
-  visual_det_range  <<- (2 * sqrt(320 / (env_xmax * env_ymax))) ^ -1
+  visual_det_range  <<- (2 * sqrt(nTree / (env_xmax * env_ymax))) ^ -1
   eat_range         <<- 0
   edibilityPrim     <<- 100
+  
+  forgetting_rate  <<- 0.001
+  weight_time_dist <<- 2 # weight of time vs distance. time 2 times as important
   
   # Parameters related to cognitive abilities of primates
   scalarproptimeval <<- 0.00
@@ -951,7 +1212,7 @@ initialize_env_agent <- function() {
 ABM <- function(init_time = 60, sim_time = 365) {
   
   #initialize environmental and agent parameters
-  initialize_env_agent()
+  initialize_env_agent(nTree = nTree)
   
   ###### Creating Food Trees ######
   # Creating locations of food.
@@ -1000,21 +1261,23 @@ ABM <- function(init_time = 60, sim_time = 365) {
   Primate_agent_hist[[1]] <- Primate_agent
   Primate_agent_hist[[2]] <- Primate_agent
   time_hist[1:2] <- 0
-  
+  moved <- 0
+    
   time <- 0
   ts <- 2
   
   ###### Run Initialization Simulation ######
   while (time < timemax) {
-    
-    movement_primatelist <- move_primate(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
+
+    movement_primatelist <- move_primate(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts, time_to_ripen = time_to_ripen, weight_time_dist = weight_time_dist)
     Primate_agent <- movement_primatelist[[1]]
     Trees <- movement_primatelist[[2]]
     Temporal_remembered <- movement_primatelist[[3]]
+    moved <- movement_primatelist[[4]]
     
     rm(movement_primatelist)
-    
-    time <- timepassage(Primate_agent, Primate_agent_hist, ts, time)  # Distance-based time progression
+
+    time <- timepassage(moved, time, movspeed = movspeed, eatrate = eatrate)  # Distance-based time progression
     
     if (time > timemax) {        
       timelist <- timecap(Primate_agent, Primate_agent_hist, Trees, Trees_hist, ts, time, tmax = timemax)
@@ -1023,18 +1286,18 @@ ABM <- function(init_time = 60, sim_time = 365) {
       Trees <- timelist[[3]]
       rm(timelist)
     }
-    
+
     # Update memory and tree states
     Temporal_remembered <- Remembertemporal(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
     Temporal_remembered <- discard_mem(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
-    Temporal_remembered <- forgetting(Temporal_remembered, time_hist, time, ts)
-    
+    Temporal_remembered <- forgetting(Temporal_remembered, time_hist, time, ts, forgetting_rate = forgetting_rate)
+
     Trees <- fruitripening(Trees, time_hist, time, ts)
     Trees <- fruitdecay(Trees, time_hist, time, ts)
     Trees <- fruiting(Trees, time_hist, time, ts)
     
     ts <- ts + 1
-    
+
     # Expand allocated size if exceeded
     if (ts > allocated_size) {
       allocated_size <- as.integer(round(allocated_size * 1.05))
@@ -1045,6 +1308,7 @@ ABM <- function(init_time = 60, sim_time = 365) {
     Primate_agent_hist[[ts]] <- Primate_agent
     Trees_hist <- Trees
     time_hist[ts] <- time
+    
   }
   
   # Trim excess allocation
@@ -1054,11 +1318,15 @@ ABM <- function(init_time = 60, sim_time = 365) {
   timemax <- sim_time
   allocated_size <- round(timemax * 5.1)
   
-  # Retain last two locations for correlated random walk
-  Primate_agent_hist_extra <- vector("list", 2)
-  Primate_agent_hist_extra[[1]] <- Primate_agent_hist[[length(Primate_agent_hist) - 1]]
-  Primate_agent_hist_extra[[2]] <- Primate_agent_hist[[length(Primate_agent_hist)]]
+  # Reset Primate agent
+  Primate_agent <<- cbind(
+    AgentNo = 1, 
+    Xcoord = (env_xmax - env_xmin) / 2, 
+    Ycoord = (env_ymax - env_ymin) / 2, 
+    eaten = 0
+  )
   
+
   Primate_agent_hist <- vector("list", timemax)
   Trees_hist <- matrix(nrow = nTree, ncol = ncol(Trees))
   time_hist <- numeric(allocated_size)
@@ -1068,25 +1336,27 @@ ABM <- function(init_time = 60, sim_time = 365) {
   Primate_agent[1, 4] <- 0  # Reset eaten fruit count
   
   # Assign initial agent states
-  Primate_agent_hist[[1]] <- Primate_agent_hist_extra[[1]]
-  Primate_agent_hist[[2]] <- Primate_agent_hist_extra[[2]]
-  rm(Primate_agent_hist_extra)
-  
+  Primate_agent_hist[[1]] <- Primate_agent
+  Primate_agent_hist[[2]] <- Primate_agent
+
   time_hist[1:2] <- 0
   time <- 0
   ts <- 2
   
+  moved <- 0
+  
   ###### Run Execution Simulation ######
   while (time < timemax) {
-    
-    movement_primatelist <- move_primate(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
+
+    movement_primatelist <- move_primate(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts, time_to_ripen = time_to_ripen, weight_time_dist = weight_time_dist)
     Primate_agent <- movement_primatelist[[1]]
     Trees <- movement_primatelist[[2]]
     Temporal_remembered <- movement_primatelist[[3]]
+    moved <- movement_primatelist[[4]]
     
     rm(movement_primatelist)
     
-    time <- timepassage(Primate_agent, Primate_agent_hist, ts, time)
+    time <- timepassage(moved, time, movspeed = movspeed, eatrate = eatrate)
     
     if (time > timemax) {        
       timelist <- timecap(Primate_agent, Primate_agent_hist, Trees, Trees_hist, ts, time, tmax = timemax)
@@ -1095,16 +1365,16 @@ ABM <- function(init_time = 60, sim_time = 365) {
       Trees <- timelist[[3]]
       rm(timelist)
     }
-    
+
     # Update memory and tree states
     Temporal_remembered <- Remembertemporal(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
     Temporal_remembered <- discard_mem(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
-    Temporal_remembered <- forgetting(Temporal_remembered, time_hist, time, ts)
+    Temporal_remembered <- forgetting(Temporal_remembered, time_hist, time, ts, forgetting_rate = forgetting_rate)
     
     Trees <- fruitripening(Trees, time_hist, time, ts)
     Trees <- fruitdecay(Trees, time_hist, time, ts)
     Trees <- fruiting(Trees, time_hist, time, ts)
-    
+
     ts <- ts + 1
     
     # Expand allocated size if exceeded
@@ -1144,7 +1414,7 @@ ABM <- function(init_time = 60, sim_time = 365) {
 # (sd) is zero. If sd is zero, the function returns the mean value as the 
 # result. Otherwise, it generates truncated normal random variables using `rtruncnorm`.
 #
-# Parameters:
+# Arguments:
 # - n     : The number of random variables to generate.
 # - a     : The lower bound for truncation (default is -Inf).
 # - b     : The upper bound for truncation (default is Inf).
@@ -1170,7 +1440,7 @@ new_rtruncnorm <- function(n, a = -Inf, b = Inf, mean = 0, sd = 1) {
 # generated coordinates are outside the boundary, it recursively generates new 
 # coordinates to replace the invalid ones.
 #
-# Parameters:
+# Arguments:
 #   num_trees_per_center : Integer. The number of tree coordinates to generate.
 #   center_x             : Numeric. The X-coordinate of the center of the distribution.
 #   center_y             : Numeric. The Y-coordinate of the center of the distribution.
@@ -1232,7 +1502,7 @@ generate_centered_trees <- function(num_trees_per_center, center_x, center_y, sd
 # that the total number of trees is divided as evenly as possible between the centers. 
 # If there are any leftover trees, they are added to the last center.
 #
-# Parameters:
+# Arguments:
 #   num_trees   : Integer. The total number of tree coordinates to generate.
 #   num_centers : Integer. The number of centers around which trees will be generated.
 #   std_dev     : Numeric. The standard deviation that determines the spread of trees 
@@ -1289,7 +1559,7 @@ generate_het_env <- function(num_trees, num_centers, std_dev, x_min, x_max, y_mi
 #   following a circular bivariate normal distribution. The number of centers and the standard deviation of the distribution 
 #   are specified by `n_centers` and `std`.
 #
-# Parameters:
+# Arguments:
 #   ntree     : The number of tree coordinates to generate.
 #   xmin      : he minimum X-coordinate boundary of the environment.
 #   xmax      : The maximum X-coordinate boundary of the environment.
@@ -1327,7 +1597,7 @@ generate_env <- function(ntree, xmin, xmax, ymin, ymax, homogenous = 1, n_center
 # This function assigns a probability based on the tu_diff and determines whether
 # a Tree should be targeted based on this.
 # 
-# Parameters:
+# Arguments:
 #   tu_diff : The estimated difference between to time to ripen - elapsed time 
 #   scale   : scale that ensures that smaller values of tu_diff yield higher probabilities of 1.
 targeting <- function(tu_diff, scale = target_scale) {
@@ -1341,6 +1611,102 @@ targeting <- function(tu_diff, scale = target_scale) {
   return(rbinom(1, 1, prob))
 }
 
+
+
+
+##### Function: path_encounter #####
+# Checks if trees are encountered on the way
+#
+# Arguments :
+#   Ax, Ay            : Starting coordinates of A (agent)
+#   angle_deg         : Movement direction in degrees
+#   step_length       : Moved distance along the path to check
+#   Tree_matrix       : Matrix of Tree locations (columns: x, y coordinates)
+#   detection_radius  : Visual detection radius
+
+path_encounter <- function(
+    Ax, Ay,              
+    angle_deg,           
+    step_length,         
+    Tree_matrix,            
+    detection_radius     
+) {
+  
+  # Convert movement angle to radians
+  angle_rad <- angle_deg * pi / 180
+  
+  # Unit vector in movement direction
+  dx <- sin(angle_rad)  # x component
+  dy <- cos(angle_rad)  # y component
+  
+  # Vector from each Tree to A
+  dxATree <- Ax - Tree_matrix[,1]  # x-component difference
+  dyATree <- Ay - Tree_matrix[,2]  # y-component difference
+  
+  
+  # Quadratic coefficients for intersection of line with circle
+  # Circle: (x - Treex)^2 + (y - Treey)^2 = detection_radius^2
+  # Line: A moves along (Ax + s*dx, Ay + s*dy), s >= 0
+  
+  a <- 1  # dx^2 + dy^2 = 1 (unit vector)
+  b <- 2 * (dxATree * dx + dyATree * dy)
+  c <- dxATree^2 + dyATree^2 - detection_radius^2
+  
+  # Discriminant to check real intersection
+  disc <- b^2 - 4*a*c
+  
+  # Keep only Trees with real intersections
+  valid_disc <- disc >= 0
+  if (!any(valid_disc)) return(NULL)  # No intersections at all
+  
+  # Subset to valid Trees
+  dxATree <- dxATree[valid_disc]
+  dyATree <- dyATree[valid_disc]
+  b <- b[valid_disc]
+  disc <- disc[valid_disc]
+  Tree_matrix_valid <- Tree_matrix[valid_disc,,drop=FALSE]
+  Tree_indices <- which(valid_disc)  # original row indices of valid Trees
+  
+  
+  # Solve quadratic for intersection points (distance along path)
+  
+  sqrt_disc <- sqrt(disc)
+  s1 <- (-b - sqrt_disc)/2
+  s2 <- (-b + sqrt_disc)/2
+  
+  # Only keep forward intersections (s >= 0)
+  s1[s1 < 0] <- NA
+  s2[s2 < 0] <- NA
+  
+  # Take first positive intersection per Tree
+  s_first <- pmin(s1, s2, na.rm=TRUE)
+  
+  # Only keep intersections within step_length
+  keep <- !is.na(s_first) & (s_first <= step_length)
+  if (!any(keep)) return(NULL)  # No Tree detected within step length
+  
+  # Subset to those Trees
+  s_first <- s_first[keep]
+  Tree_matrix_final <- Tree_matrix_valid[keep,,drop=FALSE]
+  Tree_indices_final <- Tree_indices[keep]  # keep original indices
+  
+  # Compute entry coordinates and distance to Tree
+  entry_x <- Ax + s_first * dx
+  entry_y <- Ay + s_first * dy
+  distance_entry_to_Tree <- sqrt((entry_x - Tree_matrix_final[,1])^2 + 
+                                   (entry_y - Tree_matrix_final[,2])^2)
+  
+  # Find first encountered Tree along the path
+  first_idx <- which.min(s_first)
+  
+  # Return list with :
+  list(
+    Tree_index = Tree_indices_final[first_idx],        # Row of Tree in original Tree_matrix
+    distance_along_path = s_first[first_idx],    # Distance traveled along path to detection
+    entry_point = c(entry_x[first_idx], entry_y[first_idx]), # Coordinates where Tree is detected
+    distance_entry_to_Tree = distance_entry_to_Tree[first_idx]     # Distance from entry point to Tree (= detection_radius)
+  )
+}
 
 
 ####### Compiling Functions #######
@@ -1369,6 +1735,10 @@ generate_centered_trees <- cmpfun(generate_centered_trees)
 generate_het_env        <- cmpfun(generate_het_env)
 generate_env            <- cmpfun(generate_env)
 random_movement         <- cmpfun(random_movement)
+collision               <- cmpfun(collision)
+safe_angle_segment      <- cmpfun(safe_angle_segment)
 refl_boundary           <- cmpfun(refl_boundary)
 move_2target            <- cmpfun(move_2target)
 targeting               <- cmpfun(targeting)
+path_encounter          <- cmpfun(path_encounter)
+
