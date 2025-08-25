@@ -439,7 +439,7 @@ fruiting <- function(food, time_history, time, timestep,
 # 3. Filters trees with unripe fruit.
 # 4. Calculates distances from the agent's current or previous location to the trees.
 # 5. Filters trees that are within the agent's visual detection range.
-# 6. Identifies the closest tree and updates the agent's memory if it's not already stored.
+# 6. Incorporate trees in memory if it's not already stored.
 Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
                              xloc_agent = 2, yloc_agent = 3, 
                              xloc_food = 2, yloc_food = 3, 
@@ -533,7 +533,7 @@ Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
       distance(prim_agent[1, xloc_agent], prim_agent[1, yloc_agent], row[1], row[2])
     })
     
-    # order trees based on first encounted 
+    # order trees based on first encountered 
     ordered_distances <- distances[order(dist_to_end, decreasing = T), ]  
     ordered_distances <- ordered_distances[1:length(empty_slots), , drop = FALSE] # reduce to the number of empty slots
     
@@ -632,7 +632,7 @@ forgetting <- function(remembered, time_history, time, timestep,
 
 
 
-##### Function: discard_mem() #####
+##### Function: update_mem() #####
 # This function updates the agent’s memory of trees and their fruit ripeness. 
 # It removes trees from memory if they no longer contain unripe fruit, ensures 
 # that a remembered tree is not mistakenly targeted, and adjusts the agent’s 
@@ -660,12 +660,13 @@ forgetting <- function(remembered, time_history, time, timestep,
 # - yloc_remembered:        Column tracking remembered tree y-coordinates.
 # - count_elapsed_ts, est_elapsed_ts: Columns tracking elapsed and estimated time since memory was created.
 
-discard_mem <- function(prim_agent, food, remembered, history, timestep,
+update_mem <- function(prim_agent, food, remembered, history, timestep,
                         xloc_agent = 2, yloc_agent = 3,
                         remembered_tree_no = 2, visdet = visual_det_range,
                         fruit_unripe = 7, target = 6, counter_to_ripen_col = 8, 
                         fruit_dim_ripeness = 10, yloc_remembered = 4, 
-                        count_elapsed_ts = 12, est_elapsed_ts = 13) {
+                        count_elapsed_ts = 12, est_elapsed_ts = 13,
+                        time_to_forget = mem_length_ts) {
   
   # Extract locations of remembered trees
   remembered_trees <- remembered[remembered[, remembered_tree_no] > 0, 1:yloc_remembered, drop = FALSE]
@@ -710,25 +711,29 @@ discard_mem <- function(prim_agent, food, remembered, history, timestep,
   }
   
   # Process remembered trees within visual detection range
-  if (any(treedistances_remembered[, 3] < visdet)) {
-    
+  treedist_visible <- treedistances_remembered[, 3] < visdet
+  
+  if (any(treedist_visible)) {
     # Reset memory for trees with no unripe fruit
-    reset_mask <- food[treedistances_remembered[, 2], fruit_unripe] == 0
-    remembered[reset_mask * treedistances_remembered[, 1], c(2:6, 8, 10:13)] <- 
-      matrix(rep(c(0, 0, 0, 0, 0, 0, 10000, 0, 0, 0), 
-                 times = sum(reset_mask)), ncol = 10, byrow = TRUE)
+    reset_mask <- (food[treedistances_remembered[, 2], fruit_unripe] == 0) & treedist_visible
+    if (any(reset_mask)) {
+      remembered[reset_mask, c(2:6, 8, 10:13)] <- 
+        matrix(rep(c(0, 0, 0, 0, 0, 0, 10000, 0, 0, 0), 
+                   times = sum(reset_mask)), ncol = 10, byrow = TRUE)
+    }
     
-    # Identify trees that still contain unripe fruit and are also a target
-    rem_unripe_target <- (food[treedistances_remembered[, 2], fruit_unripe] != 0) * 
-      treedistances_remembered[, 1] * 
-      remembered[treedistances_remembered[, 1], target]
+    # Identify trees that still contain unripe fruit within visual detection range
+    rem_unripe_update <- (food[treedistances_remembered[, 2], fruit_unripe] != 0) & treedist_visible
     
     # Ensure `rem_unripe_target` has valid indices before assignment
-    if (any(rem_unripe_target > 0)) {
-      remembered[rem_unripe_target, counter_to_ripen_col] <- 
-        scalarpropertyfun(food[rem_unripe_target, fruit_dim_ripeness])
-      
-      remembered[rem_unripe_target, c(target, count_elapsed_ts, est_elapsed_ts)] <- 0
+    if (any(rem_unripe_update)) {
+      remembered[rem_unripe_update, c(5, 6, 8, 12, 13)] <- cbind(
+        time_to_forget,  # Forget time
+        0, # Should not be a target
+        scalarpropertyfun(food[treedistances_remembered[rem_unripe_update, 2], fruit_dim_ripeness]),  # Estimated ripening time
+        0, # count_elapsed_ts
+        0 # est_elapsed_ts
+      )
     }
   }
   
@@ -1289,7 +1294,7 @@ ABM <- function(init_time = 60, sim_time = 365) {
 
     # Update memory and tree states
     Temporal_remembered <- Remembertemporal(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
-    Temporal_remembered <- discard_mem(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
+    Temporal_remembered <- update_mem(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
     Temporal_remembered <- forgetting(Temporal_remembered, time_hist, time, ts, forgetting_rate = forgetting_rate)
 
     Trees <- fruitripening(Trees, time_hist, time, ts)
@@ -1368,7 +1373,7 @@ ABM <- function(init_time = 60, sim_time = 365) {
 
     # Update memory and tree states
     Temporal_remembered <- Remembertemporal(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
-    Temporal_remembered <- discard_mem(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
+    Temporal_remembered <- update_mem(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
     Temporal_remembered <- forgetting(Temporal_remembered, time_hist, time, ts, forgetting_rate = forgetting_rate)
     
     Trees <- fruitripening(Trees, time_hist, time, ts)
@@ -1723,7 +1728,7 @@ scalarpropertyfun       <- cmpfun(scalarpropertyfun)
 decay                   <- cmpfun(decay)
 Remembertemporal        <- cmpfun(Remembertemporal)
 forgetting              <- cmpfun(forgetting)
-discard_mem             <- cmpfun(discard_mem)
+update_mem              <- cmpfun(update_mem)
 move_primate            <- cmpfun(move_primate)
 timepassage             <- cmpfun(timepassage)
 timecap                 <- cmpfun(timecap)
@@ -1741,4 +1746,3 @@ refl_boundary           <- cmpfun(refl_boundary)
 move_2target            <- cmpfun(move_2target)
 targeting               <- cmpfun(targeting)
 path_encounter          <- cmpfun(path_encounter)
-
