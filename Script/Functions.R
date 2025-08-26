@@ -520,7 +520,7 @@ Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
       food[distances[, 1], yloc_food],  # Tree Y location
       time_to_forget,  # Forget time
       remembered[empty_slots[1:nrow(distances)], 7] + 1,  # Memory count
-      scalarpropertyfun(food[distances[, 1], fruit_dim_ripeness]),  # Estimated ripening time
+      ripeness_estim(food[distances[, 1], fruit_dim_ripeness]),  # Estimated ripening time
       food[distances[, 1], fruit_unripe]  # Unripe fruit count
     )
     return(remembered)
@@ -549,7 +549,7 @@ Remembertemporal <- function(prim_agent, food, remembered, history, timestep,
     food[ordered_distances[, 1], yloc_food],  # Tree Y location
     time_to_forget,  # Forget time
     remembered[empty_slots[1:nrow(ordered_distances)], 7] + 1,  # Memory count
-    scalarpropertyfun(food[ordered_distances[, 1], fruit_dim_ripeness]),  # Estimated ripening time
+    ripeness_estim(food[ordered_distances[, 1], fruit_dim_ripeness]),  # Estimated ripening time
     food[ordered_distances[, 1], fruit_unripe]  # Unripe fruit count
   )
 
@@ -668,19 +668,10 @@ update_mem <- function(prim_agent, food, remembered, history, timestep,
                         count_elapsed_ts = 12, est_elapsed_ts = 13,
                         time_to_forget = mem_length_ts) {
   
-  # Extract locations of remembered trees
-  remembered_trees <- remembered[remembered[, remembered_tree_no] > 0, 1:yloc_remembered, drop = FALSE]
-  
   # Ensure there are remembered trees before proceeding
-  if (nrow(remembered_trees) == 0) {
+  if (sum(remembered[, remembered_tree_no] == 0)) {
     return(remembered)  # Nothing to process, return unchanged
   }
-  
-  treelocations_remembered <- cbind(
-    remembered_trees,  # First 4 cols: remembered number, tree number, x, y
-    rep(prim_agent[1, xloc_agent], times = nrow(remembered_trees)),
-    rep(prim_agent[1, yloc_agent], times = nrow(remembered_trees))
-  )
   
   # Compute distance to remembered locations if agent moved
   prev_x <- history[[timestep - 1]][1, xloc_agent]
@@ -689,52 +680,48 @@ update_mem <- function(prim_agent, food, remembered, history, timestep,
   curr_y <- prim_agent[1, yloc_agent]
   
   if (prev_x != curr_x || prev_y != curr_y) {
-    treedistances_remembered <- cbind(
-      treelocations_remembered[, 1:2, drop = FALSE],  # Remembered number, tree number
+    treedistances <- cbind(
+      remembered,  # Remembered number, tree number
       linedistances(
-        matrix(treelocations_remembered[, 3:4, drop = FALSE], ncol = 2),
+        matrix(remembered[, 3:4, drop = FALSE], ncol = 2),
         matrix(c(prev_x, prev_y, curr_x, curr_y), ncol = 2, byrow = TRUE)
       )
     )
   } else {
-    treedistances_remembered <- cbind(
-      treelocations_remembered[, 1:2, drop = FALSE],
+    treedistances <- cbind(
+      remembered,
       mapply(distance,
-             treelocations_remembered[, 3], treelocations_remembered[, 4],
-             treelocations_remembered[, 5], treelocations_remembered[, 6])
+             remembered[, 3], remembered[, 4],
+             rep(prim_agent[1, xloc_agent], times = nrow(remembered)),
+             rep(prim_agent[1, yloc_agent], times = nrow(remembered))
+             )
     )
   }
   
-  # Ensure `treedistances_remembered` is not empty before accessing column 3
-  if (nrow(treedistances_remembered) == 0) {
-    return(remembered)  # Nothing to process, return unchanged
-  }
+  # Remembered trees within visual detection range that have no more unripe fruit
+  treedist_visible_nofruit <- (treedistances[, 14] < visdet) & (treedistances[, remembered_tree_no] != 0) & (food[treedistances[, 2], fruit_unripe]  == 0)
   
-  # Process remembered trees within visual detection range
-  treedist_visible <- treedistances_remembered[, 3] < visdet
-  
-  if (any(treedist_visible)) {
+  if (any(treedist_visible_nofruit)) {
     # Reset memory for trees with no unripe fruit
-    reset_mask <- (food[treedistances_remembered[, 2], fruit_unripe] == 0) & treedist_visible
-    if (any(reset_mask)) {
-      remembered[reset_mask, c(2:6, 8, 10:13)] <- 
-        matrix(rep(c(0, 0, 0, 0, 0, 0, 10000, 0, 0, 0), 
-                   times = sum(reset_mask)), ncol = 10, byrow = TRUE)
-    }
+    remembered[treedist_visible_nofruit, c(2:6, 8, 10:13)] <- 
+      matrix(rep(c(0, 0, 0, 0, 0, 0, 10000, 0, 0, 0), 
+                 times = sum(treedist_visible_nofruit)), ncol = 10, byrow = TRUE)
+  }
     
-    # Identify trees that still contain unripe fruit within visual detection range
-    rem_unripe_update <- (food[treedistances_remembered[, 2], fruit_unripe] != 0) & treedist_visible
+  # Identify trees that still contain unripe fruit within visual detection range
+  treedist_visible_fruit <- (treedistances[, 14] < visdet) & (treedistances[, remembered_tree_no] != 0) & (food[treedistances[, 2], fruit_unripe]  != 0)
+  
+  # Update memory for trees with unripe fruit
+  if (any(treedist_visible_fruit)) {
     
-    # Ensure `rem_unripe_target` has valid indices before assignment
-    if (any(rem_unripe_update)) {
-      remembered[rem_unripe_update, c(5, 6, 8, 12, 13)] <- cbind(
-        time_to_forget,  # Forget time
-        0, # Should not be a target
-        scalarpropertyfun(food[treedistances_remembered[rem_unripe_update, 2], fruit_dim_ripeness]),  # Estimated ripening time
-        0, # count_elapsed_ts
-        0 # est_elapsed_ts
-      )
-    }
+    remembered[treedist_visible_fruit, c(5, 6, 12, 13)] <- cbind(time_to_forget,  # Forget time
+      0, # Should not be a target
+      0, # count_elapsed_ts
+      0 # est_elapsed_ts
+    )
+    
+    tree_nr_upd <- remembered[treedist_visible_fruit, remembered_tree_no]
+    remembered[treedist_visible_fruit, counter_to_ripen_col]  <- ripeness_estim(food[tree_nr_upd, fruit_dim_ripeness])  # Estimated ripening time
   }
   
   return(remembered)
@@ -1000,7 +987,7 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
 
 
 
-###### Function: scalarpropertyfun() ######
+###### Function: ripeness_estim() ######
 # This function estimates the number of time units required for a fruit to become ripe.
 # 
 # Arguments:
@@ -1013,17 +1000,15 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
 # Returns:
 # - Estimated time units until the fruit reaches ripeness.
 
-scalarpropertyfun <- function(y_value, 
+ripeness_estim <- function(y_value, 
                               b_value = (100 / time_to_ripen),  
-                              bwaarde = scalarproptimeval, 
                               edibile = edibilityPrim) {
   
   # Ensure that y_value does not exceed the edibility threshold
   y_value[y_value > edibile] <- edibile
   
   # Compute estimated time to ripeness with a normally distributed error term
-  estimated_time <- ((edibile - y_value) / b_value) - 
-    rnorm(n = 1, mean = 0, sd = bwaarde * ((edibile - y_value) / b_value))
+  estimated_time <- ((edibile - y_value) / b_value)
   
   return(estimated_time)
 }
@@ -1724,7 +1709,7 @@ ripen                   <- cmpfun(ripen)
 fruittipening           <- cmpfun(fruitripening)
 fruitdecay              <- cmpfun(fruitdecay)
 fruiting                <- cmpfun(fruiting)
-scalarpropertyfun       <- cmpfun(scalarpropertyfun)
+ripeness_estim          <- cmpfun(ripeness_estim)
 decay                   <- cmpfun(decay)
 Remembertemporal        <- cmpfun(Remembertemporal)
 forgetting              <- cmpfun(forgetting)
