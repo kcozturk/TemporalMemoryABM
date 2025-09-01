@@ -579,7 +579,9 @@ forgetting <- function(remembered, time_history, time, timestep,
                        tree_no = 2, forget_counter = 5, 
                        count_elapsed_ts = 12, est_elapsed_ts = 13, 
                        inac_fact = inaccuracy_factor,
-                       forgetting_rate = forgetting_rate) {
+                       forgetting_rate = forgetting_rate,
+                       dynamic_inac = dynamic_inaccuracy, # this is F or T
+                       dynamic_inac_rel = dynamic_inac_relationship) { # This is F | list with elem.1 "linear" | "exp" elem.2 avalue, elem.2 bvalue
   
   # Identify filled memory slots
   memories <- remembered[, tree_no] > 0
@@ -591,6 +593,17 @@ forgetting <- function(remembered, time_history, time, timestep,
   passed_time <- time - time_history[timestep]
   
   if (sum(memories) > 0) {
+    
+    if (dynamic_inac == T) { # dynamic inaccuracy 
+      if (dynamic_inac_rel[[1]] == "linear") {
+        # linear relationship
+        inac_fact <- dynamic_inac_rel[[2]] * sum(memories) - dynamic_inac_rel[[3]] # values (0.99/22) (0.77/22)
+      } else {
+        # exponential relationship
+        inac_fact <- exp(dynamic_inac_rel[[2]] * sum(memories)) - dynamic_inac_rel[[3]] # values 0.03059238 1.02106513
+      }
+    }
+    
     # Estimate elapsed time
     est_passed_time <- sapply(which(memories), function(i) { new_rtruncnorm(1,
                                                                             a = -1 * remembered[i, est_elapsed_ts],
