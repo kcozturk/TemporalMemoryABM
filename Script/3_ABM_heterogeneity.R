@@ -8,7 +8,7 @@ library(truncnorm)
 library(compiler)     
 library(future.apply) 
 
-setwd("/home/Documents/ABM")  # Set working directory
+setwd("/home/picocluster/Documents/ABM")  # Set working directory
 source("Functions.R")  # Load external functions
 
 plan(multicore, workers = 6)  # Enable parallel processing with 6 workers
@@ -17,21 +17,23 @@ plan(multicore, workers = 6)  # Enable parallel processing with 6 workers
 seed <- 3
 script_max_comb <- 12 * 12 * 8 # for unique combinations acros simulations determine max combinations for all scripts
 
-nTree <- 320        # Productivity
+nTree <- 400        # Productivity
 time_to_dis <- 4    # Decay Period
 nr_simul <- 300     # Number of simulations
 homogen <- 0        # Homogeneity parameter
 num_cent <- 10      # Number of tree clusters
 memoryused <- TRUE  # Enable memory usage
 
-mem_length_ts <- 120  # Memory retention time before it is forgotten
+dynamic_inaccuracy <- F               # dynamic Inaccuracy (T/F)
+dynamic_inac_relationship <- F        #"linear" or "exp"
+
 target_scale <- 0.5   # Scale determining the probability that memory is targeted
 movspeed <- 500       # Movement speed of agent
 eatrate <- 10         # The time in which an agent eats 1 afu. 
 
 # Generate sequences for parameter values
 n_inacc_memslot <- 12
-inaccuracy_factor_values <- seq(0, by = 0.09, length.out = n_inacc_memslot)
+inaccuracy_factor_values <- seq(0.01, by = 0.09, length.out = n_inacc_memslot)
 memory_slots_values <- seq(1, by = 2, length.out = n_inacc_memslot)
 cent_std_values <- 2.5 * 2^(0:7)
 
@@ -71,4 +73,3 @@ for (z in 1:total_combinations) {
   # Save results to CSV
   write.csv(output, file = paste0("Output/output_hetero", z, ".csv"))
 }
-
