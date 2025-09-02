@@ -580,8 +580,9 @@ forgetting <- function(remembered, time_history, time, timestep,
                        count_elapsed_ts = 12, est_elapsed_ts = 13, 
                        inac_fact = inaccuracy_factor,
                        forgetting_rate = forgetting_rate,
-                       dynamic_inac = dynamic_inaccuracy, # this is F or T
-                       dynamic_inac_rel = dynamic_inac_relationship) { # This is F | list with elem.1 "linear" | "exp" elem.2 avalue, elem.2 bvalue
+                       dynamic_inac = dynamic_inaccuracy,
+                       dynamic_inac_rel = dynamic_inac_relationship,
+                       inac_a_b = dynamic_inac_a_b) { 
   
   # Identify filled memory slots
   memories <- remembered[, tree_no] > 0
@@ -595,12 +596,12 @@ forgetting <- function(remembered, time_history, time, timestep,
   if (sum(memories) > 0) {
     
     if (dynamic_inac == T) { # dynamic inaccuracy 
-      if (dynamic_inac_rel[[1]] == "linear") {
+      if (dynamic_inac_rel == "linear") {
         # linear relationship
-        inac_fact <- dynamic_inac_rel[[2]] * sum(memories) - dynamic_inac_rel[[3]] # values (0.99/22) (0.77/22)
-      } else {
+        inac_fact <- inac_a_b[1] * sum(memories) - inac_a_b[2] # values (0.99/22) (0.77/22)
+      } else if (dynamic_inac_rel == "exp") {
         # exponential relationship
-        inac_fact <- exp(dynamic_inac_rel[[2]] * sum(memories)) - dynamic_inac_rel[[3]] # values 0.03059238 1.02106513
+        inac_fact <- exp(inac_a_b[1] * sum(memories)) - inac_a_b[2] # values 0.03059238 1.02106513
       }
     }
     
@@ -1153,8 +1154,28 @@ initialize_env_agent <- function(nTree = nTree) {
   forgetting_rate  <<- 0.001
   weight_time_dist <<- 2 # weight of time vs distance. time 2 times as important
   
+  mem_length_ts     <<- 120 # Is not used anymore.
+  
   # Parameters related to cognitive abilities of primates
   scalarproptimeval <<- 0.00
+  dynamic_inac_a_b <<- c((0.99/22), (0.77/22))
+  
+  if (dynamic_inac_relationship == "exp") {
+    f <- function(x) {
+      a <- x[1]
+      b <- x[2]
+      eq1 <- exp(a*1) - b - 0.01
+      eq2 <- exp(a*23) - b - 1
+      return(c(eq1, eq2))
+    }
+    
+    # Initial guesses (a small positive, b around 0)
+    xstart <- c(0, 0)
+    
+    sol <- nleqslv(xstart, f)
+    dynamic_inac_a_b[1] <- sol$x[1]
+    dynamic_inac_a_b[2] <- sol$x[2]
+  }
   
   # Random movement parameters (for correlated random walk)
   stepsize_mean     <<- 100
