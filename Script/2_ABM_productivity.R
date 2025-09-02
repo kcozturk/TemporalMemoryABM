@@ -8,7 +8,7 @@ library(truncnorm)
 library(compiler)     
 library(future.apply) 
 
-setwd("/home/Documents/ABM")  # Set working directory
+setwd("/home/picocluster/Documents/ABM")  # Set working directory
 source("Functions.R")  # Load external functions
 
 plan(multicore, workers = 6)  # Enable parallel processing with 6 workers
@@ -23,16 +23,18 @@ homogen <- 1        # Homogeneity parameter
 cent_std <- 0       # Standard deviation of centered trees
 memoryused <- TRUE  # Enable memory usage
 
-mem_length_ts <- 120  # Memory retention time before it is forgotten
+dynamic_inaccuracy <- F               # dynamic Inaccuracy (T/F)
+dynamic_inac_relationship <- F        #"linear" or "exp"
+
 target_scale <- 0.5   # Scale determining the probability that memory is targeted
 movspeed <- 500       # Movement speed of agent
 eatrate <- 10         # The time in which an agent eats 1 afu. 
 
 # Generate sequences for parameter values
 n_inacc_memslot <- 12
-inaccuracy_factor_values <- seq(0, by = 0.09, length.out = n_inacc_memslot)
+inaccuracy_factor_values <- seq(0.01, by = 0.09, length.out = n_inacc_memslot)
 memory_slots_values <- seq(1, by = 2, length.out = n_inacc_memslot)
-nTree_values <- 20 * 2^(0:7)
+nTree_values <- 25 * 2^(0:7)
 
 # Create all parameter combinations
 param_grid <- expand.grid(inaccuracy_factor = inaccuracy_factor_values, 
@@ -70,4 +72,3 @@ for (z in 1:total_combinations) {
   # Save results to CSV
   write.csv(output, file = paste0("Output/output_prod", z, ".csv"))
 }
-
