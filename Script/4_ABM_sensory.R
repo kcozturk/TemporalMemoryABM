@@ -8,7 +8,7 @@ library(truncnorm)
 library(compiler)     
 library(future.apply) 
 
-setwd("/home/Documents/ABM")  # Set working directory
+setwd("/home/picocluster/Documents/ABM")  # Set working directory
 source("Functions.R")  # Load external functions
 
 plan(multicore, workers = 6)  # Enable parallel processing with 6 workers
@@ -17,7 +17,7 @@ plan(multicore, workers = 6)  # Enable parallel processing with 6 workers
 seed <- 4
 script_max_comb <- 12 * 12 * 8 # for unique combinations acros simulations determine max combinations for all scripts
 
-nTree <- 320          # Productivity
+nTree <- 400          # Productivity
 nr_simul <- 300       # Number of simulations
 homogen <- 1          # Homogeneity parameter
 cent_std <- 0         # Standard deviation of centered trees
@@ -25,7 +25,9 @@ memoryused <- F       # Disable memory usage
 memory_slots <- 1
 inaccuracy_factor <- 0
 
-mem_length_ts <- 120  # Memory retention time before it is forgotten
+dynamic_inaccuracy <- F               # dynamic Inaccuracy (T/F)
+dynamic_inac_relationship <- F        #"linear" or "exp"
+
 target_scale <- 0.5   # Scale determining the probability that memory is targeted
 movspeed <- 500       # Movement speed of agent
 eatrate <- 10         # The time in which an agent eats 1 afu. 
@@ -95,13 +97,15 @@ memoryused <- F     # Enable memory usage
 memory_slots <- 1   
 inaccuracy_factor <- 0
 
-mem_length_ts <- 120  # Memory retention time before it is forgotten
+dynamic_inaccuracy <- F               # dynamic Inaccuracy (T/F)
+dynamic_inac_relationship <- F        #"linear" or "exp"
+
 target_scale <- 0.5 # Scale determining the probability that memory is targeted
 movspeed <- 500       # Movement speed of agent
 eatrate <- 10         # The time in which an agent eats 1 afu. 
 
 # Generate sequences for parameter values
-nTree_values <- 20 * 2^(0:7)
+nTree_values <- 25 * 2^(0:7)
 
 # Create all parameter combinations
 param_grid <- expand.grid(nTree = nTree_values)
@@ -157,7 +161,7 @@ plan(multicore, workers = 6)  # Enable parallel processing with 6 workers
 seed <- 6
 script_max_comb <- 12 * 12 * 8 # for unique combinations acros simulations determine max combinations for all scripts
 
-nTree <- 320        # Productivity
+nTree <- 400        # Productivity
 time_to_dis <- 4    # Decay Period
 nr_simul <- 300     # Number of simulations
 homogen <- 0        # Homogeneity parameter
@@ -166,7 +170,9 @@ memoryused <- F     # Enable memory usage
 memory_slots <- 1     
 inaccuracy_factor <- 0
 
-mem_length_ts <- 120  # Memory retention time before it is forgotten
+dynamic_inaccuracy <- F               # dynamic Inaccuracy (T/F)
+dynamic_inac_relationship <- F        #"linear" or "exp"
+
 target_scale <- 0.5 # Scale determining the probability that memory is targeted
 movspeed <- 500       # Movement speed of agent
 eatrate <- 10         # The time in which an agent eats 1 afu. 
@@ -206,4 +212,3 @@ for (z in 1:total_combinations) {
   # Save results to CSV
   write.csv(output, file = paste0("Output/output_sensory_hetero", z, ".csv"))
 }
-
