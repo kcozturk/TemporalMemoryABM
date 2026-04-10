@@ -7,6 +7,7 @@ library(circular)
 library(truncnorm)    
 library(compiler)     
 library(future.apply) 
+suppressWarnings(library(pcds))
 
 setwd("/home/picocluster/Documents/ABM")  # Set working directory
 source("Functions.R")  # Load external functions
@@ -51,6 +52,9 @@ colnames(output) <- c("eaten", "n_fruits_created", "scalarproptimeval", "inaccur
                       "memory_slots", "stepsize_mean", "stepsize_sd", "wrapped_rho",
                       "time", "ts", "seed" , "cent_std", "memory")
 
+# Col names movement
+cols_mov <- c("Xcoord", "Ycoord", "eaten", "time", "branch")
+
 # Run simulations for each parameter combination
 for (z in 1:total_combinations) {
   
@@ -63,10 +67,24 @@ for (z in 1:total_combinations) {
   results_list <- future_lapply(1:nr_simul, function(x) {
       global_seed <- (seed - 1) * (nr_simul * script_max_comb) + (z - 1) * nr_simul + x
       set.seed(global_seed)
-      ABM()
-      }, future.seed = TRUE)
 
-  
+      res <- ABM()
+
+      # Output movement inside the worker
+      move <- res$movement
+      if (!is.null(move)) {
+        move <- move[, cols_mov, drop = FALSE]
+        move <- cbind(sim_id = x, move)
+
+        fname <- sprintf("Output/mov_tradeoff_lin_decay_z%04d_sim%04d.csv", z, x)
+        write.csv(move, file = fname, row.names = FALSE)
+      }
+
+      # return only summary to main R
+      res$summary
+
+  }, future.seed = TRUE)
+
   # Convert results to array
   output <- simplify2array(results_list)
   
@@ -86,6 +104,7 @@ library(circular)
 library(truncnorm)    
 library(compiler)     
 library(future.apply) 
+suppressWarnings(library(pcds))
 
 setwd("/home/picocluster/Documents/ABM")  # Set working directory
 source("Functions.R")  # Load external functions
@@ -130,6 +149,9 @@ colnames(output) <- c("eaten", "n_fruits_created", "scalarproptimeval", "inaccur
                       "memory_slots", "stepsize_mean", "stepsize_sd", "wrapped_rho",
                       "time", "ts", "seed", "cent_std", "memory")
 
+# Col names movement
+cols_mov <- c("Xcoord", "Ycoord", "eaten", "time", "branch")
+
 # Run simulations for each parameter combination
 for (z in 1:total_combinations) {
   
@@ -142,9 +164,24 @@ for (z in 1:total_combinations) {
   results_list <- future_lapply(1:nr_simul, function(x) {
     global_seed <- (seed - 1) * (nr_simul * script_max_comb) + (z - 1) * nr_simul + x
     set.seed(global_seed)
-    ABM()
+
+      res <- ABM()
+
+      # Output movement inside the worker
+      move <- res$movement
+      if (!is.null(move)) {
+        move <- move[, cols_mov, drop = FALSE]
+        move <- cbind(sim_id = x, move)
+
+        fname <- sprintf("Output/mov_tradeoff_lin_prod_z%04d_sim%04d.csv", z, x)
+        write.csv(move, file = fname, row.names = FALSE)
+      }
+
+      # return only summary to main R
+      res$summary
+
   }, future.seed = TRUE)
-  
+
   # Convert results to array
   output <- simplify2array(results_list)
   
@@ -163,6 +200,7 @@ library(circular)
 library(truncnorm)    
 library(compiler)     
 library(future.apply) 
+suppressWarnings(library(pcds))
 
 setwd("/home/picocluster/Documents/ABM")  # Set working directory
 source("Functions.R")  # Load external functions
@@ -209,6 +247,9 @@ colnames(output) <- c("eaten", "n_fruits_created", "scalarproptimeval", "inaccur
                       "memory_slots", "stepsize_mean", "stepsize_sd", "wrapped_rho",
                       "time", "ts", "seed", "cent_std", "memory")
 
+# Col names movement
+cols_mov <- c("Xcoord", "Ycoord", "eaten", "time", "branch")
+
 # Run simulations for each parameter combination
 for (z in 1:total_combinations) {
   
@@ -221,9 +262,24 @@ for (z in 1:total_combinations) {
   results_list <- future_lapply(1:nr_simul, function(x) {
     global_seed <- (seed - 1) * (nr_simul * script_max_comb) + (z - 1) * nr_simul + x
     set.seed(global_seed)
-    ABM()
+
+      res <- ABM()
+
+      # Output movement inside the worker
+      move <- res$movement
+      if (!is.null(move)) {
+        move <- move[, cols_mov, drop = FALSE]
+        move <- cbind(sim_id = x, move)
+
+        fname <- sprintf("Output/mov_tradeoff_lin_hetero_z%04d_sim%04d.csv", z, x)
+        write.csv(move, file = fname, row.names = FALSE)
+      }
+
+      # return only summary to main R
+      res$summary
+
   }, future.seed = TRUE)
-  
+
   # Convert results to array
   output <- simplify2array(results_list)
   
