@@ -743,6 +743,104 @@ update_mem <- function(prim_agent, food, remembered, history, timestep,
 
 
 
+
+##### Function: update_mem_no_remov() #####
+# This function is the same as update_mem() but has one difference:
+# Remembered trees within visual detection range that contain no unripe fruit are
+# not removed from memory
+# 
+# ## Functional Logic:
+# - If an agent moves, compute distances to remembered trees.
+# - If a remembered tree is within visual range:
+# - If it still has unripe fruit but was a target, adjust the agent’s guess on ripening time.
+#
+# ## Parameters:
+# - prim_agent:             Matrix containing the agent’s location.
+# - food:                   Matrix with trees and fruit ripeness details.
+# - remembered:             Matrix tracking remembered tree locations.
+# - history:                List tracking past agent positions.
+# - timestep:               The current timestep.
+# - xloc_agent, yloc_agent: Column indices for the agent’s x and y location.
+# - remembered_tree_no:     Column index storing the tree number in memory.
+# - visdet:                 The agent’s vision detection range.
+# - fruit_unripe:           Column index in `food` tracking unripe fruit counts.
+# - target_col:             Column in `remembered` indicating if a tree is a target.
+# - counter_to_ripen_col:   Column tracking when an agent estimates fruit will ripen.
+# - fruit_ripeness_col:     Column in `food` indicating fruit ripeness.
+# - yloc_remembered:        Column tracking remembered tree y-coordinates.
+# - count_elapsed_ts, est_elapsed_ts: Columns tracking elapsed and estimated time since memory was created.
+
+update_mem_no_remov <- function(prim_agent, food, remembered, history, timestep,
+                       xloc_agent = 2, yloc_agent = 3,
+                       remembered_tree_no = 2, visdet = visual_det_range,
+                       fruit_unripe = 7, target = 6, counter_to_ripen_col = 8, 
+                       fruit_dim_ripeness = 10, yloc_remembered = 4, 
+                       count_elapsed_ts = 12, est_elapsed_ts = 13,
+                       time_to_forget = mem_length_ts) {
+  
+  # Ensure there are remembered trees before proceeding
+  if (sum(remembered[, remembered_tree_no] == 0)) {
+    return(remembered)  # Nothing to process, return unchanged
+  }
+  
+  # Compute distance to remembered locations if agent moved
+  prev_x <- history[[timestep - 1]][1, xloc_agent]
+  prev_y <- history[[timestep - 1]][1, yloc_agent]
+  curr_x <- prim_agent[1, xloc_agent]
+  curr_y <- prim_agent[1, yloc_agent]
+  
+  if (prev_x != curr_x || prev_y != curr_y) {
+    treedistances <- cbind(
+      remembered,  # Remembered number, tree number
+      linedistances(
+        matrix(remembered[, 3:4, drop = FALSE], ncol = 2),
+        matrix(c(prev_x, prev_y, curr_x, curr_y), ncol = 2, byrow = TRUE)
+      )
+    )
+  } else {
+    treedistances <- cbind(
+      remembered,
+      mapply(distance,
+             remembered[, 3], remembered[, 4],
+             rep(prim_agent[1, xloc_agent], times = nrow(remembered)),
+             rep(prim_agent[1, yloc_agent], times = nrow(remembered))
+      )
+    )
+  }
+  
+  # Remembered trees within visual detection range that have no more unripe fruit
+  treedist_visible_nofruit <- (treedistances[, 14] < visdet) & (treedistances[, remembered_tree_no] != 0) & (food[treedistances[, 2], fruit_unripe]  == 0)
+
+  if (any(treedist_visible_nofruit)) {
+    # Do not forget memory for trees with no unripe fruit, but untarget and make ripeness_estim past simulation (i.e. 365 + 60)
+    remembered[treedist_visible_nofruit, c(6, 8, 12, 13)] <-
+      matrix(rep(c(0, 425, 0, 0),
+                 times = sum(treedist_visible_nofruit)), ncol = 4, byrow = TRUE)
+  }
+  
+  # Identify trees that still contain unripe fruit within visual detection range
+  treedist_visible_fruit <- (treedistances[, 14] < visdet) & (treedistances[, remembered_tree_no] != 0) & (food[treedistances[, 2], fruit_unripe]  != 0)
+  
+  # Update memory for trees with unripe fruit
+  if (any(treedist_visible_fruit)) {
+    
+    remembered[treedist_visible_fruit, c(5, 6, 12, 13)] <- cbind(time_to_forget,  # Forget time
+                                                                 0, # Should not be a target
+                                                                 0, # count_elapsed_ts
+                                                                 0 # est_elapsed_ts
+    )
+    
+    tree_nr_upd <- remembered[treedist_visible_fruit, remembered_tree_no]
+    remembered[treedist_visible_fruit, counter_to_ripen_col]  <- ripeness_estim(food[tree_nr_upd, fruit_dim_ripeness])  # Estimated ripening time
+  }
+  
+  return(remembered)
+}
+
+
+
+
+
 ###### Function: move_primate() ######
 # Simulates movement of an agent (primate) using episodic memory.
 #
@@ -793,6 +891,7 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
   
   # Initialize tracking variables
   memory_used <- F
+  branch      <- "none"  
   
   # Extract agent's location
   prim_x <- prim_agent[1, xloc_agent]
@@ -817,8 +916,12 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
     min_index <- which.min(treedistances_ripe[, 2])    
     closesttree_ripe <- treedistances_ripe[min_index, ]
     
+    
+    tol <- 1e-8  # or similar small value
+    
     # ========== EATING ==========
-    if (closesttree_ripe[2] == eatdist) {
+    if (closesttree_ripe[2] <= eatdist + tol) {
+      branch <- "eat"              
       eaten <- "Y"
       food[closesttree_ripe[1], fruit_col_prim] <- food[closesttree_ripe[1], fruit_col_prim] - 1
       
@@ -830,20 +933,21 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
       # The fruit that is eaten is counted for the agent
       prim_agent[1, eaten_col] <- prim_agent[1, eaten_col] + 1
       
-      return(list(prim_agent, food, remembered, moved = 0))
+      return(list(prim_agent, food, remembered, moved = 0, branch = branch))
       
     } else if (closesttree_ripe[2] < visdet) {
       
+      branch <- "visual"           
       # ========== VISUAL DETECTION ==========
       # If one of trees is in detection range. It will move to the closest tree 
       prim_agent[1, yloc_agent] <- food[closesttree_ripe[1], yloc_food]
       prim_agent[1, xloc_agent] <- food[closesttree_ripe[1], xloc_food]
       
-      # Calculate movement distance from previous timestep
-      moved <- distance(prim_agent[1, xloc_agent], prim_agent[1, yloc_agent],
-                        food[closesttree_ripe[1], xloc_food], food[closesttree_ripe[1], yloc_food])
-        
-      return(list(prim_agent, food, remembered, moved))
+      # Calculate movement distance from previous timestep                       
+      moved <- distance(prim_x, prim_y,
+                        prim_agent[1, xloc_agent], prim_agent[1, yloc_agent])
+      
+      return(list(prim_agent, food, remembered, moved, branch = branch))
     }
   }
   
@@ -907,7 +1011,8 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
                                   prim_x, prim_y)
       
       # If the targeted location is out-of-sight, the agent moves to target
-      if (distance_target > visdet) {  
+      if (distance_target > visdet) {
+        branch <- "memory_move"    
         prim_agent[1, c(xloc_agent, yloc_agent)] <- move_2target(prim_x, prim_y, 
                                                                  remembered[nr_target, remembered_tree_x],
                                                                  remembered[nr_target, remembered_tree_y],
@@ -923,12 +1028,13 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
       }
     }
   }
-
+  
   
   #  ========= RANDOM MOVEMENT ========== 
   prim_agent_refl <- NULL
   
-  if (!memory_used) {                                
+  if (!memory_used) {
+    branch <- "random"            
     move <- random_movement(history[[timestep - 1]][1,xloc_agent], 
                             history[[timestep - 1]][1,yloc_agent],
                             prim_x, prim_y, stepmean = stepmean, 
@@ -944,7 +1050,7 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
                                      step = dist_move, 
                                      xmin = xmin, xmax = xmax, 
                                      ymin = ymin, ymax = ymax)
-
+    
     prim_agent[1, c(xloc_agent, yloc_agent)] <- c(prim_agent_refl[[1]], prim_agent_refl[[2]])
     
   }
@@ -965,39 +1071,40 @@ move_primate <- function(prim_agent, food, remembered, history, timestep,
     # If reflective boundary was used and there was nothing at first segment:
     if (length(encountered) == 0 && length(prim_agent_refl[[4]]) != 0) {    
       
-        # Determine if trees with ripe fruit are encountered on second segment of path (after reflection)
-        encountered2 <- path_encounter(prim_agent_refl[[4]][1], prim_agent_refl[[4]][2], 
-                                      prim_agent_refl[[5]], 
-                                       distance(prim_agent_refl[[4]][1], 
-                                                prim_agent_refl[[4]][2], 
-                                                prim_agent_refl[[4]][3], 
-                                                prim_agent_refl[[4]][4]), 
-                                       matrix(treelocations_ripe[, 2:3], ncol = 2), visdet)
+      # Determine if trees with ripe fruit are encountered on second segment of path (after reflection)
+      encountered2 <- path_encounter(prim_agent_refl[[4]][1], prim_agent_refl[[4]][2], 
+                                     prim_agent_refl[[5]], 
+                                     distance(prim_agent_refl[[4]][1], 
+                                              prim_agent_refl[[4]][2], 
+                                              prim_agent_refl[[4]][3], 
+                                              prim_agent_refl[[4]][4]), 
+                                     matrix(treelocations_ripe[, 2:3], ncol = 2), visdet)
     }
   }
-
+  
   # Adjust location of agent if a tree was encountered across the CRW, 
   # determine moved distance.
   if (length(encountered) > 0) { 
     prim_agent[1, xloc_agent:yloc_agent] <- treelocations_ripe[encountered[[1]], 2:3, drop=FALSE]  
     moved <- encountered[[2]] + encountered[[4]] # moved distance
     
-    } else if (length(prim_agent_refl[[4]]) != 0 && length(encountered2) > 0) { 
-      prim_agent[1, xloc_agent:yloc_agent] <- treelocations_ripe[encountered2[[1]], 2:3, drop=FALSE]  
-      moved1 <- distance(prim_agent_refl[[3]][1], 
-                         prim_agent_refl[[3]][2], 
-                         prim_agent_refl[[3]][3], 
-                         prim_agent_refl[[3]][4]) # moved distance along first segment
-      moved2 <- encountered2[[2]] + encountered2[[4]] # moved distance along second segment
-      moved <- moved1 + moved2
-    } else {
+  } else if (length(prim_agent_refl[[4]]) != 0 && length(encountered2) > 0) { 
+    prim_agent[1, xloc_agent:yloc_agent] <- treelocations_ripe[encountered2[[1]], 2:3, drop=FALSE]  
+    moved1 <- distance(prim_agent_refl[[3]][1], 
+                       prim_agent_refl[[3]][2], 
+                       prim_agent_refl[[3]][3], 
+                       prim_agent_refl[[3]][4]) # moved distance along first segment
+    moved2 <- encountered2[[2]] + encountered2[[4]] # moved distance along second segment
+    moved <- moved1 + moved2
+  } else {
     # Calculate movement distance from previous timestep
     moved <- distance(prim_x, prim_y, prim_agent[1, xloc_agent], prim_agent[1, yloc_agent])
   }
   
   
-  return(list(prim_agent, food, remembered, moved))                                                                    
+  return(list(prim_agent, food, remembered, moved, branch))                                                                    
 }
+
 
 
 
@@ -1039,6 +1146,8 @@ ripeness_estim <- function(y_value,
 #
 # Arguments:
 # - moved:        Moved distance of agent
+# - eaten_now:    Eatn at current ts
+# - eaten_prev:   Eaten at previous ts
 # - time:         Current time value.
 # - movspeed:     Speed of movement.
 # - eatrate:      Eating rate.
@@ -1046,14 +1155,15 @@ ripeness_estim <- function(y_value,
 # Returns:
 # - Updated time value.
 
-timepassage <- function(moved, time,
+timepassage <- function(moved, eaten_now, eaten_prev, time,
                         movspeed = movspeed, eatrate = eatrate) {
   
-  # Update time based on movement or eating action
-  if (moved > 0) {
-    time <- time + (moved / movspeed)
+  ate <- eaten_now > eaten_prev   # TRUE if fruit eaten this step
+  
+  if (ate) {
+    time <- time + (1 / eatrate)      # eating costs 1/eatrate time units
   } else {
-    time <- time + (1 / eatrate)  # If no movement, eating occurred
+    time <- time + (moved / movspeed) # otherwise time comes from movement
   }
   
   return(time)
@@ -1285,23 +1395,33 @@ ABM <- function(init_time = 60, sim_time = 365) {
   Primate_agent_hist[[1]] <- Primate_agent
   Primate_agent_hist[[2]] <- Primate_agent
   time_hist[1:2] <- 0
+  branch_hist <- character(allocated_size) 
   moved <- 0
-    
+  
   time <- 0
   ts <- 2
   
   ###### Run Initialization Simulation ######
   while (time < timemax) {
-
+    
     movement_primatelist <- move_primate(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts, time_to_ripen = time_to_ripen, weight_time_dist = weight_time_dist)
     Primate_agent <- movement_primatelist[[1]]
     Trees <- movement_primatelist[[2]]
     Temporal_remembered <- movement_primatelist[[3]]
     moved <- movement_primatelist[[4]]
+    branch_used   <- movement_primatelist[[5]]   
     
     rm(movement_primatelist)
-
-    time <- timepassage(moved, time, movspeed = movspeed, eatrate = eatrate)  # Distance-based time progression
+    
+    eaten_prev <- Primate_agent_hist[[ts]][1, "eaten"]  # eaten before this step
+    eaten_now  <- Primate_agent[1, "eaten"]             # eaten after move_primate()
+    
+    time <- timepassage(moved,
+                        eaten_now  = eaten_now,
+                        eaten_prev = eaten_prev,
+                        time       = time,
+                        movspeed   = movspeed,
+                        eatrate    = eatrate)
     
     if (time > timemax) {        
       timelist <- timecap(Primate_agent, Primate_agent_hist, Trees, Trees_hist, ts, time, tmax = timemax)
@@ -1310,33 +1430,36 @@ ABM <- function(init_time = 60, sim_time = 365) {
       Trees <- timelist[[3]]
       rm(timelist)
     }
-
+    
     # Update memory and tree states
     Temporal_remembered <- Remembertemporal(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
     Temporal_remembered <- update_mem(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
     Temporal_remembered <- forgetting(Temporal_remembered, time_hist, time, ts, forgetting_rate = forgetting_rate)
-
+    
     Trees <- fruitripening(Trees, time_hist, time, ts)
     Trees <- fruitdecay(Trees, time_hist, time, ts)
     Trees <- fruiting(Trees, time_hist, time, ts)
     
     ts <- ts + 1
-
+    
     # Expand allocated size if exceeded
     if (ts > allocated_size) {
       allocated_size <- as.integer(round(allocated_size * 1.05))
       length(time_hist) <- allocated_size
+      length(branch_hist) <- allocated_size
     }
     
     # Store updated objects
     Primate_agent_hist[[ts]] <- Primate_agent
     Trees_hist <- Trees
     time_hist[ts] <- time
+    branch_hist[ts] <- branch_used
     
   }
   
   # Trim excess allocation
-  time_hist <- time_hist[1:(ts - 1)]
+  time_hist <- time_hist[1:ts]  # keep all filled entries
+  branch_hist <- branch_hist[1:ts]
   
   ###### Run Main Simulation (365 timesteps) ######
   timemax <- sim_time
@@ -1350,7 +1473,7 @@ ABM <- function(init_time = 60, sim_time = 365) {
     eaten = 0
   )
   
-
+  
   Primate_agent_hist <- vector("list", timemax)
   Trees_hist <- matrix(nrow = nTree, ncol = ncol(Trees))
   time_hist <- numeric(allocated_size)
@@ -1362,7 +1485,7 @@ ABM <- function(init_time = 60, sim_time = 365) {
   # Assign initial agent states
   Primate_agent_hist[[1]] <- Primate_agent
   Primate_agent_hist[[2]] <- Primate_agent
-
+  
   time_hist[1:2] <- 0
   time <- 0
   ts <- 2
@@ -1371,16 +1494,25 @@ ABM <- function(init_time = 60, sim_time = 365) {
   
   ###### Run Execution Simulation ######
   while (time < timemax) {
-
+    
     movement_primatelist <- move_primate(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts, time_to_ripen = time_to_ripen, weight_time_dist = weight_time_dist)
     Primate_agent <- movement_primatelist[[1]]
     Trees <- movement_primatelist[[2]]
     Temporal_remembered <- movement_primatelist[[3]]
     moved <- movement_primatelist[[4]]
+    branch_used   <- movement_primatelist[[5]]   
     
     rm(movement_primatelist)
     
-    time <- timepassage(moved, time, movspeed = movspeed, eatrate = eatrate)
+    eaten_prev <- Primate_agent_hist[[ts]][1, "eaten"]  # eaten before this step
+    eaten_now  <- Primate_agent[1, "eaten"]              # eaten after move_primate()
+    
+    time <- timepassage(moved,
+                        eaten_now  = eaten_now,
+                        eaten_prev = eaten_prev,
+                        time       = time,
+                        movspeed   = movspeed,
+                        eatrate    = eatrate)
     
     if (time > timemax) {        
       timelist <- timecap(Primate_agent, Primate_agent_hist, Trees, Trees_hist, ts, time, tmax = timemax)
@@ -1389,7 +1521,7 @@ ABM <- function(init_time = 60, sim_time = 365) {
       Trees <- timelist[[3]]
       rm(timelist)
     }
-
+    
     # Update memory and tree states
     Temporal_remembered <- Remembertemporal(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
     Temporal_remembered <- update_mem(Primate_agent, Trees, Temporal_remembered, Primate_agent_hist, ts)
@@ -1398,26 +1530,35 @@ ABM <- function(init_time = 60, sim_time = 365) {
     Trees <- fruitripening(Trees, time_hist, time, ts)
     Trees <- fruitdecay(Trees, time_hist, time, ts)
     Trees <- fruiting(Trees, time_hist, time, ts)
-
+    
     ts <- ts + 1
     
     # Expand allocated size if exceeded
     if (ts > allocated_size) {
       allocated_size <- as.integer(round(allocated_size * 1.1))
       length(time_hist) <- allocated_size
+      length(branch_hist) <- allocated_size
     }
     
     # Store updated objects
     Primate_agent_hist[[ts]] <- Primate_agent
     Trees_hist <- Trees
     time_hist[ts] <- time
+    branch_hist[ts] <- branch_used
   }
   
-  # Trim excess allocation
-  time_hist <- time_hist[1:(ts - 1)]
+  time_hist <- time_hist[1:ts]  # keep all filled entries
+  branch_hist <- branch_hist[1:ts]
+  
+  movement_matrix <- do.call(rbind, Primate_agent_hist)[1:ts, , drop = FALSE]
+  movement_matrix <- cbind(
+    movement_matrix[-1, , drop = FALSE],  # drop initial state at t = 0
+    time = time_hist[-1],                  # drop corresponding first time
+    branch = branch_hist[-1]              
+  )
   
   # Return output
-  c(
+  summary_vec <- c(
     eaten = Primate_agent[1, 4], n_fruits_created = sum(Trees[, 8]), 
     scalarproptimeval = scalarproptimeval, inaccuracy_factor = inaccuracy_factor, 
     time_to_ripen = time_to_ripen, edibilityPrim = edibilityPrim, time_to_dis = time_to_dis, 
@@ -1427,6 +1568,10 @@ ABM <- function(init_time = 60, sim_time = 365) {
     mem_length_ts = mem_length_ts, memory_slots = memory_slots, 
     stepsize_mean = stepsize_mean, stepsize_sd = stepsize_sd, wrapped_rho = wrapped_rho, 
     time = time, ts = ts, seed = seed, cent_std = cent_std, memory = memoryused)
+  
+  list(
+    summary = summary_vec,
+    movement = movement_matrix)
 }
 
 
@@ -1765,3 +1910,4 @@ refl_boundary           <- cmpfun(refl_boundary)
 move_2target            <- cmpfun(move_2target)
 targeting               <- cmpfun(targeting)
 path_encounter          <- cmpfun(path_encounter)
+update_mem_no_remov     <- cmpfun(update_mem_no_remov)
