@@ -7,6 +7,8 @@ library(circular)
 library(truncnorm)    
 library(compiler)     
 library(future.apply) 
+suppressWarnings(library(pcds))
+
 
 setwd("/home/picocluster/Documents/ABM")  # Set working directory
 source("Functions.R")  # Load external functions
@@ -24,9 +26,10 @@ homogen <- 0        # Homogeneity parameter
 num_cent <- 10      # Number of tree clusters
 memoryused <- TRUE  # Enable memory usage
 
-dynamic_inaccuracy <- F               # dynamic Inaccuracy (T/F)
-dynamic_inac_relationship <- F        #"linear" or "exp"
+dynamic_inaccuracy <- F        # dynamic Inaccuracy (T/F)
+dynamic_inac_relationship <- F #"linear" or "exp"
 
+mem_length_ts <- 120  # Memory retention time before it is forgotten
 target_scale <- 0.5   # Scale determining the probability that memory is targeted
 movspeed <- 500       # Movement speed of agent
 eatrate <- 10         # The time in which an agent eats 1 afu. 
@@ -52,6 +55,9 @@ colnames(output) <- c("eaten", "n_fruits_created", "scalarproptimeval", "inaccur
                       "memory_slots", "stepsize_mean", "stepsize_sd", "wrapped_rho",
                       "time", "ts", "seed", "cent_std", "memory")
 
+# Col names movement
+cols_mov <- c("Xcoord", "Ycoord", "eaten", "time", "branch")
+
 # Run simulations for each parameter combination
 for (z in 1:total_combinations) {
   
@@ -64,10 +70,25 @@ for (z in 1:total_combinations) {
   results_list <- future_lapply(1:nr_simul, function(x) {
       global_seed <- (seed - 1) * (nr_simul * script_max_comb) + (z - 1) * nr_simul + x
       set.seed(global_seed)
-      ABM()
-      }, future.seed = TRUE)
-  
-  # Convert results to array
+
+      res <- ABM()
+
+      # Output movement inside the worker
+      move <- res$movement
+      if (!is.null(move)) {
+        move <- move[, cols_mov, drop = FALSE]
+        move <- cbind(sim_id = x, move)
+
+        fname <- sprintf("Output/mov_hetero_z%04d_sim%04d.csv", z, x)
+        write.csv(move, file = fname, row.names = FALSE)
+      }
+
+      # return only summary to main R
+      res$summary
+
+  }, future.seed = TRUE)
+
+ # Convert results to array
   output <- simplify2array(results_list)
   
   # Save results to CSV
