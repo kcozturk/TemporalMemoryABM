@@ -4,21 +4,16 @@
 rm(list = ls())
 
 # Install required packages if not already installed
-# install.packages("ggplot2")
-# install.packages("ggpubr")
-# install.packages("truncnorm")
-# install.packages("data.table")
-
 library(ggplot2)
 library(ggpubr)
 library(truncnorm)
 library(data.table)
 
-# Load custom functions
-source("Functions.R")
-
 # Set working directory to script location (if running in RStudio)
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+# Load custom functions
+source("Functions.R")
 
 
 ##### --- Overview ---
@@ -30,6 +25,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 # 6. Figures Scenario 2
 # 7. Descriptive stats: Scenario 3
 # 8. Figures Supplementary Material
+# 9. Descriptive stats: timing error
 
 
 #==================================#
@@ -58,32 +54,39 @@ load_dataset <- function(pattern, n) {
 }
 
 # Main datasets (cognitive, sensory, tradeoff, nonupdate)
-df   <- load_dataset("output_decay%d.csv", 1152)
-df2  <- load_dataset("output_prod%d.csv", 1152)
-df3  <- load_dataset("output_hetero%d.csv", 1152)
+df   <- load_dataset("Output/output_decay%d.csv", 1152)
+df2  <- load_dataset("Output/output_prod%d.csv", 1152)
+df3  <- load_dataset("Output/output_hetero%d.csv", 1152)
 
-df4  <- load_dataset("output_sensory_decay%d.csv", 8)
-df5  <- load_dataset("output_sensory_prod%d.csv", 8)
-df6  <- load_dataset("output_sensory_hetero%d.csv", 8)
+df4  <- load_dataset("Output/output_sensory_decay%d.csv", 8)
+df5  <- load_dataset("Output/output_sensory_prod%d.csv", 8)
+df6  <- load_dataset("Output/output_sensory_hetero%d.csv", 8)
 
-df7  <- load_dataset("output_tradeoff_lin_decay%d.csv", 36)
-df8  <- load_dataset("output_tradeoff_lin_prod%d.csv", 36)
-df9  <- load_dataset("output_tradeoff_lin_hetero%d.csv",36)
+df7  <- load_dataset("Output/output_tradeoff_lin_decay%d.csv", 36)
+df8  <- load_dataset("Output/output_tradeoff_lin_prod%d.csv", 36)
+df9  <- load_dataset("Output/output_tradeoff_lin_hetero%d.csv",36)
 
-df10 <- load_dataset("output_tradeoff_exp_decay%d.csv", 36)
-df11 <- load_dataset("output_tradeoff_exp_prod%d.csv", 36)
-df12 <- load_dataset("output_tradeoff_exp_hetero%d.csv", 36)
+df10 <- load_dataset("Output/output_tradeoff_exp_decay%d.csv", 36)
+df11 <- load_dataset("Output/output_tradeoff_exp_prod%d.csv", 36)
+df12 <- load_dataset("Output/output_tradeoff_exp_hetero%d.csv", 36)
 
-df13 <- load_dataset("output_nonupdate_decay%d.csv", 1152)
-df14 <- load_dataset("output_nonupdate_prod%d.csv", 1152)
-df15 <- load_dataset("output_nonupdate_hetero%d.csv", 1152)
+df13 <- load_dataset("Output/output_nonupdate_decay%d.csv", 1152)
+df14 <- load_dataset("Output/output_nonupdate_prod%d.csv", 1152)
+df15 <- load_dataset("Output/output_nonupdate_hetero%d.csv", 1152)
 
+# Overview ---
+# "eaten": the number of eaten items 
+# "inaccuracy_factor": timing error of forager
+# "time_to_dis": ripe-fruit duration
+# "nTree": number of trees in environment (i.e. resource density)
+# "cent_std": patch spread
+# "memory_slots": memory size
+# "cent_std": patch spread
 
 
 #=====================================#
 ###### 2. Descriptive statistics ######
 #=====================================#
-
 
 # Cognitive vs sensory foragers: mean eaten fruits
 cog_eaten_vec <- c(df$eaten, df2$eaten, df3$eaten)
@@ -96,6 +99,7 @@ mean_sensory   <- mean(sen_eaten_vec)
 se_cognitive <- sd(cog_eaten_vec) / sqrt(length(cog_eaten_vec))
 se_sensory   <- sd(sen_eaten_vec) / sqrt(length(sen_eaten_vec))
 
+
 #==========================================#
 ###### 3. Compute Foraging Efficiency ######
 #==========================================#
@@ -106,7 +110,7 @@ averages_df5 <- aggregate(eaten ~ nTree,       data = df5, FUN = mean)
 averages_df6 <- aggregate(eaten ~ cent_std,    data = df6, FUN = mean)
 
 
-# Rename second column in sensory averages to'sensory
+# Rename second column in sensory averages to sensory
 names(averages_df4)[2] <- "sensory"
 names(averages_df5)[2] <- "sensory"
 names(averages_df6)[2] <- "sensory"
@@ -258,7 +262,6 @@ for (nm in avg_names) {
 ###### 4. Figures Introduction ######
 #===================================#
 
-
 #====================================#
 ###### FIG. 1: Simulated output ######
 #====================================#
@@ -277,7 +280,7 @@ par(mfrow = c(4, 3), oma = c(1, 1, 1.5, 1), mar = c(2, 4.3, 2.2, 1), cex.lab = 1
 set.seed(1)
 
 
-### --- A. Productivity ---
+### --- A. Patch Spread ---
 # Figures with spatial distribution of trees for different Patch Spread
 homogen           <- 0
 num_cent          <- 10
@@ -302,8 +305,8 @@ for (i in 1:3) {
 }
 
 
-### --- B. Productivity ---
-# Figures with spatial distribution of trees for different productivity
+### --- B. Tree Density ---
+# Figures with spatial distribution of trees for different Tree Densities
 
 homogen       <- 1
 nTree_values  <- c(200, 400, 800)  
@@ -327,8 +330,8 @@ for (i in 1:3) {
 
 
 
-### --- C. Productivity ---
-# Figures with ripe fruit over time for different productivity
+### --- C. Tree Density ---
+# Figures with ripe fruit over time for different Tree Density
 par(mar = c(5, 4.5, 2.2, 1))
 
 memory_slots        <- 0
@@ -337,7 +340,7 @@ homogen             <- 1
 time_to_dis         <- 4
 init_time           <- 425
 nTree_values        <- c(200, 400, 800)
-dynamic_inaccuracy <- F               # dynamic Inaccuracy (T/F)
+dynamic_inaccuracy  <- F               # dynamic Inaccuracy (T/F)
 dynamic_inac_relationship <- F        #"linear" or "exp"
 
 initialize_env_agent(nTree = nTree)
@@ -416,8 +419,8 @@ for (i in seq_along(nTree_values)) {
 }
 
 
-### --- D. Decay Period ---
-# Figures with ripe fruit over time for different decay periods
+### --- D. Ripe-Fruit Availability Period ---
+# Figures with ripe fruit over time for different Ripe-Fruit Availability Periods
 memory_slots      <- 0
 inaccuracy_factor <- 0
 homogen           <- 1
@@ -497,7 +500,7 @@ for (i in seq_along(time_to_dis_vals)) {
   points(unripefruits ~ time, data = plotdata, type = "l", col = "red")
   
   if (i == 1) {
-    mtext("D. Resource Availability Period:", side = 3, line = -42.5, cex = 0.9, 
+    mtext("D. Ripe-Fruit Duration:", side = 3, line = -42.5, cex = 0.9, 
           font = 2, adj = 0, outer = TRUE)
   }
 }
@@ -541,7 +544,7 @@ plot <- ggplot(dfA, aes(x = time_to_dis, y = log_rel_eff, group = forgetting)) +
   geom_point(aes(shape = forgetting),
              color = "black", fill = "black", size = 2) +
   scale_shape_manual(
-    name   = "active forgetting:",
+    name   = "Active forgetting:",
     values = c("active forgetting"    = 19,  # circle
                "no active forgetting" = 15), # square
     labels = c("active forgetting"    = "yes",
@@ -549,7 +552,7 @@ plot <- ggplot(dfA, aes(x = time_to_dis, y = log_rel_eff, group = forgetting)) +
   ) +
   ylim(0, 2.1) +
   labs(
-    x = "Resource Availability Period",
+    x = "Ripe-Fruit Duration",
     y = expression(paste("log(", italic(E)[r], ")")),
     tag = "A"
   ) +
@@ -587,7 +590,7 @@ plot2 <- ggplot(dfB, aes(x = nTree, y = log_rel_eff, group = forgetting)) +
   geom_point(aes(shape = forgetting),
              color = "black", fill = "black", size = 2) +
   scale_shape_manual(
-    name   = "active forgetting",
+    name   = "Active forgetting",
     values = c("active forgetting"    = 19, 
                "no active forgetting" = 15),
     labels = c("active forgetting"    = "yes",
@@ -630,7 +633,7 @@ plot3 <- ggplot(dfC, aes(x = cent_std, y = log_rel_eff, group = forgetting)) +
   geom_point(aes(shape = forgetting),
              color = "black", fill = "black", size = 2) +
   scale_shape_manual(
-    name   = "active forgetting",
+    name   = "Active forgetting",
     values = c("active forgetting"    = 19, 
                "no active forgetting" = 15),
     labels = c("active forgetting"    = "yes",
@@ -730,12 +733,14 @@ for (i in seq_along(time_values)){
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(5, 1, 1, 5),  # Remove extra space
       axis.title.y = if (i == 1) element_text(size = 11) else element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error", y = "Cognitive storage") +
-    labs(title = paste(t), tag = "A") +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.tag.position = c(0.07, 0.98),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.title = element_text(hjust = 0.5),
+      plot.tag.position = c(0.07, 0.98),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Timing error", y = "Memory size",
+         title = paste(t), tag = "A")
+  
   
   # Add the plot to the list
   plot_list_decay[[i]] <- p
@@ -780,7 +785,7 @@ legend_plot <- ggplot() +
   )
 
 
-### --- Plot B: Cross Section Cognitive Storage ---
+### --- Plot B: Cross Section Memory size ---
 
 # Define three specific memory_slots values
 selected_memory_slots <- c(1, 3, 5, 9, 23)
@@ -814,11 +819,13 @@ for (i in seq_along(time_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = if (i == 1) element_text(size = 11) else element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error", y = expression(paste("log(", italic(E)[r], ")"))) +
-    labs(tag = "B") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Timing error", 
+         y = expression(paste("log(", italic(E)[r], ")")),
+         tag = "B")
   
   # Add the plot to the list
   plot_list_decay2[[i]] <- p
@@ -843,8 +850,8 @@ legend_plot2 <- ggplot(legend_df,
   coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +  # Keep the plot area blank
   theme_void() +
   labs(
-    shape = "Cognitive\nstorage",  # Title for the legend
-    fill = "Cognitive\nstorage") +
+    shape = "Memory\nsize",  # Title for the legend
+    fill = "Memory\nsize") +
   theme(
     legend.position = "left",
     plot.margin = margin(5, 5, 5, 45),  # top, right, bottom, left    
@@ -898,11 +905,13 @@ for (i in seq_along(time_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = if (i == 1) element_text(size = 11) else element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Cognitive storage", y = expression(paste("log(", italic(E)[r], ")")))  +
-    labs(tag = "C") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Memory size", 
+         y = expression(paste("log(", italic(E)[r], ")")),
+         tag = "C")
   
   # Add the plot to the list
   plot_list_decay3[[i]] <- p
@@ -966,7 +975,7 @@ figure4left_core_nolegend <- ggpar(figure4left_core, legend = "none")
 figure4left <- annotate_figure(
   figure4left_core_nolegend,
   top = text_grob(
-    "RESOURCE AVAILABILITY PERIOD (tu):",
+    "RIPE-FRUIT DURATION (tu):",
     x = 0.46, 
     hjust = 0.5, 
     size = 14
@@ -976,7 +985,6 @@ figure4left <- annotate_figure(
 
 
 ### ===== FIG. 4 mid: Resource Density
-
 ### --- Plot A: Contour plots ---
 
 # Create matching grayscale palette
@@ -1014,12 +1022,14 @@ for (i in seq_along(nTree_values)){
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(5, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error") +
-    labs(title = paste(t), tag = "D") +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.tag.position = c(0.07, 0.98),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.title = element_text(hjust = 0.5),
+      plot.tag.position = c(0.07, 0.98),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Timing error",
+         title = paste(t), 
+         tag = "D")
   
   # Add the plot to the list
   plot_list_prod[[i]] <- p
@@ -1098,11 +1108,13 @@ for (i in seq_along(nTree_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error", y = expression(paste("log(", italic(E)[r], ")"))) +
-    labs(tag = "E") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text() else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text() else element_blank()
+      ) +  
+    labs(x = "Timing error", 
+         y = expression(paste("log(", italic(E)[r], ")")),
+         tag = "E")
   
   # Add the plot to the list
   plot_list_prod2[[i]] <- p
@@ -1127,8 +1139,8 @@ legend_plot2 <- ggplot(legend_df,
   coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +  # Keep the plot area blank
   theme_void() +
   labs(
-    shape = "Cognitive\nstorage",  # Title for the legend
-    fill = "Cognitive\nstorage") +
+    shape = "Memory\nsize",  # Title for the legend
+    fill = "Memory\nsize") +
   theme(
     legend.position = "left",
     plot.margin = margin(5, 5, 5, 45),  # top, right, bottom, left    
@@ -1182,11 +1194,12 @@ for (i in seq_along(nTree_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Cognitive storage", y = expression(paste("log(", italic(E)[r], ")")))  +
-    labs(tag = "F") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Memory size", y = expression(paste("log(", italic(E)[r], ")")),
+         tag = "F")
   
   # Add the plot to the list
   plot_list_prod3[[i]] <- p
@@ -1296,12 +1309,13 @@ for (i in seq_along(cent_std_values)){
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(5, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing Error") +
-    labs(title = paste(t), tag = "G") +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.tag.position = c(0.07, 0.98),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.title = element_text(hjust = 0.5),
+      plot.tag.position = c(0.07, 0.98),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Timing Error",
+         title = paste(t), tag = "G")
   
   # Add the plot to the list
   plot_list_het[[i]] <- p
@@ -1380,11 +1394,12 @@ for (i in seq_along(cent_std_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error") +
-    labs(tag = "H") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text() else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text() else element_blank()
+      ) +  
+    labs(x = "Timing error",
+         tag = "H")
   
   # Add the plot to the list
   plot_list_het2[[i]] <- p
@@ -1409,8 +1424,8 @@ legend_plot2 <- ggplot(legend_df,
   coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +  # Keep the plot area blank
   theme_void() +
   labs(
-    shape = "Cognitive\nstorage",  # Title for the legend
-    fill = "Cognitive\nstorage") +
+    shape = "Memory\nsize",  # Title for the legend
+    fill = "Memory\nsize") +
   theme(
     legend.position = "left",
     plot.margin = margin(5, 5, 5, 45),  # top, right, bottom, left    
@@ -1464,11 +1479,12 @@ for (i in seq_along(cent_std_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Cognitive storage")  +
-    labs(tag = "I") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Memory size",
+         tag = "I")
   
   # Add the plot to the list
   plot_list_het3[[i]] <- p
@@ -1540,7 +1556,7 @@ figure4right <- annotate_figure(
 
 
 ### =====  FIG. 4: Combined the three figures side by side
-title_left <- text_grob("RESOURCE AVAILABILITY PERIOD (tu):", size = 14)
+title_left <- text_grob("RIPE-FRUIT DURATION (tu):", size = 14)
 title_mid <- text_grob("RESOURCE DENSITY (×10^-6 trees/alu^2):", size = 14)
 title_right <- text_grob("PATCH SPREAD (alu):", size = 14)
 
@@ -1716,7 +1732,7 @@ plotA <- ggplot(best_vals_n_freq1) +
   ) +
   
   labs(x = "Timing error",
-       y = "Cognitive storage",
+       y = "Memory size",
        tag = "A") +
   
   # main env: full lines
@@ -1867,7 +1883,7 @@ plotB <- ggplot(best_vals_n_freq2) +
   ) +
   
   labs(x = "Timing error",
-       y = "Cognitive storage",
+       y = "Memory size",
        tag = "B") +
   
   # main env: full lines 
@@ -1946,31 +1962,22 @@ segments_df_nu <- data.frame(
   yend = best_vals_n_freq3_nu$memory_slots[-1]
 )
 
-##  MIDPOINT ARROW SEGMENTS (forward & backward for main env) 
 
-# main env: forward direction arrow at midpoint
-halfway_segments_df_fwd <- segments_df
+##  MIDPOINT ARROW SEGMENTS
+# main env midpoint segments
+halfway_segments_df <- segments_df
 dx <- segments_df$xend - segments_df$x
 dy <- segments_df$yend - segments_df$y
 
 mid_x <- segments_df$x + 0.5 * dx
 mid_y <- segments_df$y + 0.5 * dy
 
-halfway_segments_df_fwd$x    <- mid_x - 0.5 * arrow_frac * dx
-halfway_segments_df_fwd$y    <- mid_y - 0.5 * arrow_frac * dy
-halfway_segments_df_fwd$xend <- mid_x + 0.5 * arrow_frac * dx
-halfway_segments_df_fwd$yend <- mid_y + 0.5 * arrow_frac * dy
+halfway_segments_df$x    <- mid_x - 0.5 * arrow_frac * dx
+halfway_segments_df$y    <- mid_y - 0.5 * arrow_frac * dy
+halfway_segments_df$xend <- mid_x + 0.5 * arrow_frac * dx
+halfway_segments_df$yend <- mid_y + 0.5 * arrow_frac * dy
 
-# main env: backward direction arrow at midpoint (reverse)
-halfway_segments_df_bwd <- halfway_segments_df_fwd
-tmp_x    <- halfway_segments_df_bwd$x
-tmp_y    <- halfway_segments_df_bwd$y
-halfway_segments_df_bwd$x    <- halfway_segments_df_bwd$xend
-halfway_segments_df_bwd$y    <- halfway_segments_df_bwd$yend
-halfway_segments_df_bwd$xend <- tmp_x
-halfway_segments_df_bwd$yend <- tmp_y
-
-# second env: forward arrow at midpoint
+# second env midpoint segments
 halfway_segments_df_nu <- segments_df_nu
 dx_nu <- segments_df_nu$xend - segments_df_nu$x
 dy_nu <- segments_df_nu$yend - segments_df_nu$y
@@ -2025,7 +2032,7 @@ plotC <- ggplot(best_vals_n_freq3) +
   ) +
   
   labs(x = "Timing error",
-       y = "Cognitive storage",
+       y = "Memory size",
        tag = "C") +
   
   # main env: full lines 
@@ -2033,14 +2040,8 @@ plotC <- ggplot(best_vals_n_freq3) +
                aes(x = x, y = y, xend = xend, yend = yend),
                color = "black", alpha = 0.4,
                inherit.aes = FALSE, show.legend = FALSE) +
-  # main env: arrowhead at midpoint (forward)
-  geom_segment(data = halfway_segments_df_fwd,
-               aes(x = x, y = y, xend = xend, yend = yend),
-               arrow = arrow(length = unit(0.1, "cm")),
-               color = "black", alpha = 0.9,
-               inherit.aes = FALSE, show.legend = FALSE) +
-  # main env: arrowhead at midpoint (backward) 
-  geom_segment(data = halfway_segments_df_bwd,
+  # main env: arrowhead at midpoint 
+  geom_segment(data = halfway_segments_df,
                aes(x = x, y = y, xend = xend, yend = yend),
                arrow = arrow(length = unit(0.1, "cm")),
                color = "black", alpha = 0.9,
@@ -2051,7 +2052,7 @@ plotC <- ggplot(best_vals_n_freq3) +
                aes(x = x, y = y, xend = xend, yend = yend),
                color = "darkorange3", alpha = 0.4,
                inherit.aes = FALSE, show.legend = FALSE) +
-  # nu env: arrowhead at midpoint (forward) 
+  # nu env: arrowhead at midpoint 
   geom_segment(data = halfway_segments_df_nu,
                aes(x = x, y = y, xend = xend, yend = yend),
                arrow = arrow(length = unit(0.1, "cm")),
@@ -2124,7 +2125,7 @@ plotA <- ggplot(data = tradeoff_df_vals[, ],
   labs(y = expression(paste("log(", italic(E)[r], ")")), 
        tag = "A") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals,
     sec.axis = dup_axis( 
       name   = "Timing error",
@@ -2137,7 +2138,7 @@ plotA <- ggplot(data = tradeoff_df_vals[, ],
              size = 1.5, stroke = 0.3) + 
   scale_shape_manual(
     values = c(15, 16, 17),
-    name   = "Resource Availability Period:"
+    name   = "RIPE-FRUIT DURATION:"
   ) +
   guides(
     linetype = "none",
@@ -2176,7 +2177,7 @@ plotB <- ggplot(data = tradeoff_df2_vals[, ],
   labs(y = element_blank(), 
        tag = "B") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals,
     sec.axis = dup_axis( 
       name   = "Timing error",
@@ -2190,7 +2191,7 @@ plotB <- ggplot(data = tradeoff_df2_vals[, ],
              size = 1.5, stroke = 0.3) + 
   scale_shape_manual(
     values = c(15, 16, 17),
-    name   = "Resource Density:"
+    name   = "RESOURCE DENSITY:"
   ) +
   guides(
     linetype = "none",
@@ -2227,7 +2228,7 @@ plotC <- ggplot(data = tradeoff_df3_vals[, ],
   labs(y = element_blank(), 
        tag = "C") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals,
     sec.axis = dup_axis( 
       name   = "Timing error",
@@ -2241,7 +2242,7 @@ plotC <- ggplot(data = tradeoff_df3_vals[, ],
              size = 1.5, stroke = 0.3) + 
   scale_shape_manual(
     values = c(15, 16, 17),
-    name   = "Patch Spread:"
+    name   = "PATCH SPREAD:"
   ) +
   guides(
     linetype = "none",
@@ -2317,7 +2318,7 @@ plotA <- ggplot(data = tradeoff_df13_vals[, ],
   labs(y = expression(paste("log(", italic(E)[r], ")")), 
        tag = "D") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals,
     sec.axis = dup_axis( 
       name   = "Timing error",
@@ -2359,7 +2360,7 @@ plotB <- ggplot(data = tradeoff_df14_vals[, ],
   labs(y = element_blank(),
        tag = "E") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals,
     sec.axis = dup_axis( 
       name   = "Timing error",
@@ -2402,7 +2403,7 @@ plotC <- ggplot(data = tradeoff_df15_vals[, ],
   labs(y = element_blank(), 
        tag = "F") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals,
     sec.axis = dup_axis( 
       name   = "Timing error",
@@ -2505,7 +2506,7 @@ result_forg3 <- get_max_mem_slot(tradeoff_df15, "cent_std")
 average_mem_slot      <- mean(c(result1,      result2,      result3))
 average_forg_mem_slot <- mean(c(result_forg1, result_forg2, result_forg3))
 
-(average_forg_mem_slot / average_mem_slot) * 100
+((average_forg_mem_slot - average_mem_slot)/ average_mem_slot) * 100
 
 
 
@@ -2745,10 +2746,10 @@ plotA <- ggplot(data = max_rows,
                 aes(x = time_to_dis, 
                     y = memory_slots)) +
   ylim(min_val, max_val) +
-  labs(y = "Optimal Cognitive Storage", 
+  labs(y = "Optimal Memory Size", 
        tag = "A") + 
   scale_x_continuous( 
-    name   = "Resource Availability Period"
+    name   = "Ripe-Fruit Duration"
   ) + 
   geom_line()  +
   geom_point(color = "black",
@@ -2778,7 +2779,7 @@ plotB <- ggplot(data = max_rows2,
                 aes(x = nTree, 
                     y = memory_slots)) +
   ylim(min_val, max_val) +
-  labs(y = "Optimal Cognitive Storage", 
+  labs(y = "Optimal Memory Size", 
        tag = "B") + 
   scale_x_continuous( 
     name   = "Resource Density"
@@ -2811,7 +2812,7 @@ plotC <- ggplot(data = max_rowS2,
                 aes(x = cent_std, 
                     y = memory_slots)) +
   ylim(min_val, max_val) +
-  labs(y = "Optimal Cognitive Storage", 
+  labs(y = "Optimal Memory Size", 
        tag = "C") + 
   scale_x_continuous( 
     name   = "Patch Spread"
@@ -2858,10 +2859,10 @@ plotD <- ggplot(data = max_rows13,
                 aes(x = time_to_dis, 
                     y = memory_slots)) +
   ylim(min_val, max_val) +
-  labs(y = "Optimal Cognitive Storage", 
+  labs(y = "Optimal Memory Size", 
        tag = "D") + 
   scale_x_continuous( 
-    name   = "Resource Availability Period"
+    name   = "Ripe-Fruit Duration"
   ) + 
   geom_line()  +
   geom_point(color = "black",
@@ -2891,7 +2892,7 @@ plotE <- ggplot(data = max_rows14,
                 aes(x = nTree, 
                     y = memory_slots)) +
   ylim(min_val, max_val) +
-  labs(y = "Optimal Cognitive Storage", 
+  labs(y = "Optimal Memory Size", 
        tag = "E") + 
   scale_x_continuous( 
     name   = "Resource Density"
@@ -2924,7 +2925,7 @@ plotF <- ggplot(data = max_rows15,
                 aes(x = cent_std, 
                     y = memory_slots)) +
   ylim(min_val, max_val) +
-  labs(y = "Cognitive Storage", 
+  labs(y = "Optimal Memory Size", 
        tag = "F") + 
   scale_x_continuous( 
     name   = "Patch Spread"
@@ -2960,9 +2961,6 @@ figureS2_bot <- ggarrange(
   plotD, plotE, plotF,
   nrow = 1
 )
-
-
-
 
 
 
@@ -3031,7 +3029,7 @@ plotA <- ggplot(data = averages_df7[, ],
   labs(y = expression(paste("log(", italic(E)[r], ")")), 
        tag = "A") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals
   ) +
   geom_line(aes(linetype = factor(time_to_dis)))  +
@@ -3039,7 +3037,7 @@ plotA <- ggplot(data = averages_df7[, ],
              size = 1.5, stroke = 0.3) + 
   scale_shape_manual(
     values = c(15, 16, 17),
-    name   = "Resource Availability Period:"
+    name   = "Ripe-Fruit Duration:"
   ) +
   guides(
     linetype = "none",
@@ -3078,7 +3076,7 @@ plotB <- ggplot(data = averages_df8[, ],
   labs(y = element_blank(), 
        tag = "B") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals
   ) + 
   geom_line(aes(linetype = factor(nTree))) +
@@ -3124,7 +3122,7 @@ plotC <- ggplot(data = averages_df9[, ],
   labs(y = element_blank(), 
        tag = "C") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals
   ) + 
   geom_line(aes(linetype = factor(cent_std))) +
@@ -3185,7 +3183,7 @@ plotA <- ggplot(data = averages_df10[, ],
   labs(y = expression(paste("log(", italic(E)[r], ")")), 
        tag = "D") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals
   ) +
   geom_line(aes(linetype = factor(time_to_dis)))  +
@@ -3222,7 +3220,7 @@ plotB <- ggplot(data = averages_df11[, ],
   labs(y = element_blank(),
        tag = "E") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals
   ) + 
   geom_line(aes(linetype = factor(nTree))) +
@@ -3260,7 +3258,7 @@ plotC <- ggplot(data = averages_df12[, ],
   labs(y = element_blank(), 
        tag = "F") + 
   scale_x_continuous( 
-    name   = "Cognitive storage",
+    name   = "Memory size",
     breaks = mem_vals
   ) + 
   geom_line(aes(linetype = factor(cent_std))) +
@@ -3422,12 +3420,13 @@ for (i in seq_along(time_values)){
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(5, 1, 1, 5),  # Remove extra space
       axis.title.y = if (i == 1) element_text(size = 11) else element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error", y = "Cognitive storage") +
-    labs(title = paste(t), tag = "A") +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.tag.position = c(0.07, 0.98),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.title = element_text(hjust = 0.5),
+      plot.tag.position = c(0.07, 0.98),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Timing error", y = "Memory size",
+         title = paste(t), tag = "A")
   
   # Add the plot to the list
   plot_list_decay[[i]] <- p
@@ -3506,11 +3505,13 @@ for (i in seq_along(time_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = if (i == 1) element_text(size = 11) else element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error", y = expression(paste("log(", italic(E)[f], ")"))) +
-    labs(tag = "B") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Timing error", 
+         y = expression(paste("log(", italic(E)[f], ")")),
+         tag = "B")
   
   # Add the plot to the list
   plot_list_decay2[[i]] <- p
@@ -3535,8 +3536,8 @@ legend_plot2 <- ggplot(legend_df,
   coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +  # Keep the plot area blank
   theme_void() +
   labs(
-    shape = "Cognitive\ntorage",  # Title for the legend
-    fill = "Cognitive\nstorage") +
+    shape = "Memory\nsize",  # Title for the legend
+    fill = "Memory\nsize") +
   theme(
     legend.position = "left",
     plot.margin = margin(5, 5, 5, 45),  # top, right, bottom, left    
@@ -3590,18 +3591,18 @@ for (i in seq_along(time_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = if (i == 1) element_text(size = 11) else element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Cognitive storage", y = expression(paste("log(", italic(E)[f], ")")))  +
-    labs(tag = "C") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Memory size", 
+         y = expression(paste("log(", italic(E)[f], ")")),
+         tag = "C")
   
   # Add the plot to the list
   plot_list_decay3[[i]] <- p
   
 }
-
-
 
 
 
@@ -3658,7 +3659,7 @@ figureS4left_core_nolegend <- ggpar(figureS4left_core, legend = "none")
 figureS4left <- annotate_figure(
   figureS4left_core_nolegend,
   top = text_grob(
-    "RESOURCE AVAILABILITY PERIOD (tu):",
+    "RIPE-FRUIT DURATION (tu):",
     x = 0.46, 
     hjust = 0.5, 
     size = 14
@@ -3706,12 +3707,12 @@ for (i in seq_along(nTree_values)){
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(5, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error") +
-    labs(title = paste(t), tag = "D") +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.tag.position = c(0.07, 0.98),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.title = element_text(hjust = 0.5),
+      plot.tag.position = c(0.07, 0.98),
+      plot.tag = if (i == 1) element_text()  else element_blank()) +  
+    labs(x = "Timing error",
+         title = paste(t), tag = "D")
   
   # Add the plot to the list
   plot_list_prod[[i]] <- p
@@ -3790,11 +3791,13 @@ for (i in seq_along(nTree_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error", y = expression(paste("log(", italic(E)[f], ")"))) +
-    labs(tag = "E") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text() else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text() else element_blank()
+      ) +  
+    labs(x = "Timing error", 
+         y = expression(paste("log(", italic(E)[f], ")")),
+         tag = "E")
   
   # Add the plot to the list
   plot_list_prod2[[i]] <- p
@@ -3819,8 +3822,8 @@ legend_plot2 <- ggplot(legend_df,
   coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +  # Keep the plot area blank
   theme_void() +
   labs(
-    shape = "Cognitive\nstorage",  # Title for the legend
-    fill = "Cognitive\nstorage") +
+    shape = "Memory\nsize",  # Title for the legend
+    fill = "Memory\nsize") +
   theme(
     legend.position = "left",
     plot.margin = margin(5, 5, 5, 45),  # top, right, bottom, left    
@@ -3874,11 +3877,11 @@ for (i in seq_along(nTree_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Cognitive storage", y = expression(paste("log(", italic(E)[f], ")")))  +
-    labs(tag = "F") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text()  else element_blank()) +  
+    labs(x = "Memory size", y = expression(paste("log(", italic(E)[f], ")")),
+         tag = "F")
   
   # Add the plot to the list
   plot_list_prod3[[i]] <- p
@@ -3988,12 +3991,13 @@ for (i in seq_along(cent_std_values)){
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(5, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing Error") +
-    labs(title = paste(t), tag = "G") +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.tag.position = c(0.07, 0.98),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.title = element_text(hjust = 0.5),
+      plot.tag.position = c(0.07, 0.98),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Timing Error",
+         title = paste(t), tag = "G") 
   
   # Add the plot to the list
   plot_list_het[[i]] <- p
@@ -4072,11 +4076,12 @@ for (i in seq_along(cent_std_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Timing error") +
-    labs(tag = "H") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text() else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text() else element_blank()
+      ) +  
+    labs(x = "Timing error",
+         tag = "H") 
   
   # Add the plot to the list
   plot_list_het2[[i]] <- p
@@ -4101,8 +4106,8 @@ legend_plot2 <- ggplot(legend_df,
   coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +  # Keep the plot area blank
   theme_void() +
   labs(
-    shape = "Cognitive\nstorage",  # Title for the legend
-    fill = "Cognitive\nstorage") +
+    shape = "Memory\nsize",  # Title for the legend
+    fill = "Memory\nsize") +
   theme(
     legend.position = "left",
     plot.margin = margin(5, 5, 5, 45),  # top, right, bottom, left    
@@ -4156,11 +4161,12 @@ for (i in seq_along(cent_std_values)) {
       panel.grid = element_blank(),  # Remove gridlines
       plot.margin = margin(25, 1, 1, 5),  # Remove extra space
       axis.title.y = element_blank(),
-      axis.ticks = element_line(colour = "black")) +  
-    labs(x = "Cognitive storage")  +
-    labs(tag = "I") +
-    theme(plot.tag.position = c(0.07, 1.06),
-          plot.tag = if (i == 1) element_text()  else element_blank())
+      axis.ticks = element_line(colour = "black"),
+      plot.tag.position = c(0.07, 1.06),
+      plot.tag = if (i == 1) element_text()  else element_blank()
+      ) +  
+    labs(x = "Memory size",
+         tag = "I") 
   
   # Add the plot to the list
   plot_list_het3[[i]] <- p
@@ -4232,7 +4238,7 @@ figureS4right <- annotate_figure(
 
 
 ### =====  FIG. S4: Combined the three figures side by side
-title_left <- text_grob("RESOURCE AVAILABILITY PERIOD (tu):", size = 14)
+title_left <- text_grob("RIPE-FRUIT DURATION (tu):", size = 14)
 title_mid <- text_grob("RESOURCE DENSITY (×10^-6 trees/alu^2):", size = 14)
 title_right <- text_grob("PATCH SPREAD (alu):", size = 14)
 
@@ -4279,7 +4285,7 @@ dev.off()
 
 
 #=================================================#
-###### FIG. S5: Absolute Foraging Efficiency ######
+###### FIG. S6: Absolute Foraging Efficiency ######
 #=================================================#
 
 
@@ -4297,7 +4303,7 @@ high_eff <- rbind(high_eff,
                   )
 )
 
-high_eff$type <- c(rep("sensory", 8), rep("cognitive", 8))
+high_eff$type <- c(rep("naive", 8), rep("memory-guided", 8))
 
 # Create Plot
 plot <- ggplot(high_eff, aes(x = time_to_dis, y = abs_eff, group = type)) +
@@ -4306,14 +4312,14 @@ plot <- ggplot(high_eff, aes(x = time_to_dis, y = abs_eff, group = type)) +
              color = "black", fill = "black", size = 2) +
   scale_shape_manual(
     name   = "Forager type:",
-    values = c("sensory"    = 19,  # circle
-               "cognitive" = 15), # square
-    labels = c("sensory"    = "sensory",
-               "cognitive" = "cognitive")
+    values = c("naive"    = 19,  # circle
+               "memory-guided" = 15), # square
+    labels = c("naive"    = "naive",
+               "memory-guided" = "memory-guided")
   ) +
   ylim(0, 210) +
   labs(
-    x = "Resource Availability Period",
+    x = "Ripe-Fruit Duration",
     y = expression(paste(italic(E)[s], " or ", italic(E)[c])),
     tag = "A"
   ) +
@@ -4343,7 +4349,7 @@ high_eff2 <- rbind(high_eff2,
                    )
 )
 
-high_eff2$type <- c(rep("sensory", 8), rep("cognitive", 8))
+high_eff2$type <- c(rep("naive", 8), rep("memory-guided", 8))
 
 
 # Create Plot
@@ -4353,10 +4359,10 @@ plot2 <- ggplot(high_eff2, aes(x = nTree, y = abs_eff, group = type)) +
              color = "black", fill = "black", size = 2) +
   scale_shape_manual(
     name   = "Forager type:",
-    values = c("sensory"    = 19,  # circle
-               "cognitive" = 15), # square
-    labels = c("sensory"    = "sensory",
-               "cognitive" = "cognitive")
+    values = c("naive"    = 19,  # circle
+               "memory-guided" = 15), # square
+    labels = c("naive"    = "naive",
+               "memory-guided" = "memory-guided")
   ) +
   ylim(0, 210) +
   labs(x = "Resource Density", tag = "B") +
@@ -4387,7 +4393,7 @@ high_eff3 <- rbind(high_eff3,
                    )
 )
 
-high_eff3$type <- c(rep("sensory", 8), rep("cognitive", 8))
+high_eff3$type <- c(rep("naive", 8), rep("memory-guided", 8))
 
 
 
@@ -4398,10 +4404,10 @@ plot3 <- ggplot(high_eff3, aes(x = cent_std, y = abs_eff, group = type)) +
              color = "black", fill = "black", size = 2) +
   scale_shape_manual(
     name   = "Forager type:",
-    values = c("sensory"    = 19,  # circle
-               "cognitive" = 15), # square
-    labels = c("sensory"    = "sensory",
-               "cognitive" = "cognitive")
+    values = c("naive"    = 19,  # circle
+               "memory-guided" = 15), # square
+    labels = c("naive"    = "naive",
+               "memory-guided" = "memory-guided")
   ) +
   ylim(0, 210) +
   labs(x = "Patch Spread", tag = "C") +
@@ -4420,7 +4426,7 @@ plot3 <- ggplot(high_eff3, aes(x = cent_std, y = abs_eff, group = type)) +
 
 ### --- COMBINE AND EXPORT FIGURE ---
 
-png("FigS5.png", width = 1500, height = 500, res = 200)
+png("FigS6.png", width = 1500, height = 500, res = 200)
 
 figure <- ggarrange(
   plot, plot2, plot3,
@@ -4436,45 +4442,47 @@ dev.off()
 
 
 
+#===============================================#
+###### 9. Descriptive stats: timing error ######
+#===============================================#
 
 
-#==========================================================#
-###### 9. Encounter stats: detection radius-encounter ######
-#==========================================================#
+# extract the values for rel_eff for the min and max timing error values
+df_min <- averages_df[averages_df$inaccuracy_factor == 0.01, ]
+df_max <- averages_df[averages_df$inaccuracy_factor == 1, ]
+
+df2_min <- averages_df2[averages_df2$inaccuracy_factor == 0.01, ]
+df2_max <- averages_df2[averages_df2$inaccuracy_factor == 1, ]
+
+df3_min <- averages_df3[averages_df3$inaccuracy_factor == 0.01, ]
+df3_max <- averages_df3[averages_df3$inaccuracy_factor == 1, ]
 
 
-# Parameters
-area <- 1e6        # total area
-step_len <- 100    # movement step length
+# Order the df's based on the environmental parameter and memory slots
+df_min <- df_min[order(df_min$time_to_dis, df_min$memory_slots), ]
+df_max <- df_max[order(df_max$time_to_dis, df_max$memory_slots), ]
 
-# Compute encounter statistics
-encounter_stats <- function(n_trees, area, step_len) {
-  density <- n_trees / area
-  
-  # Detection radius set to expected nearest-neighbour distance
-  detect_rad <- 1 / (2 * sqrt(density))
-  
-  # 1D path covered within detection radius
-  covered <- 2 * detect_rad * step_len
-  
-  # Expected number of trees encountered per random movement
-  mean_encountered <- covered * density
-  
-  # Fraction of all trees encountered in one step
-  frac_encountered <- mean_encountered / n_trees
-  
-  data.frame(
-    n_trees         = n_trees,
-    detect_rad      = detect_rad,
-    mean_encountered = mean_encountered,
-    frac_encountered = frac_encountered
-  )
-}
+df2_min <- df2_min[order(df2_min$nTree, df2_min$memory_slots), ]
+df2_max <- df2_max[order(df2_max$nTree, df2_max$memory_slots), ]
 
-# Examples: low vs high density
-res_low  <- encounter_stats(n_trees = 25,   area = area, step_len = step_len)
-res_high <- encounter_stats(n_trees = 3200, area = area, step_len = step_len)
+df3_min <- df3_min[order(df3_min$cent_std, df3_min$memory_slots), ]
+df3_max <- df3_max[order(df3_max$cent_std, df3_max$memory_slots), ]
 
-rbind(res_low, res_high)
 
+# Add the rel_eff of the max inaccuracy to the df_min 
+df_min$rel_eff_max_err <- df_max$rel_eff
+df2_min$rel_eff_max_err <- df2_max$rel_eff
+df3_min$rel_eff_max_err <- df3_max$rel_eff
+
+# Combine into 1 df
+rel_eff_impr <- data.frame(rel_eff = c(df_max$rel_eff, 
+                                       df2_max$rel_eff,
+                                       df3_max$rel_eff), 
+                           rel_eff_max_err = c(
+                             df_min$rel_eff_max_err,
+                             df2_min$rel_eff_max_err,
+                             df_min$rel_eff_max_err))
+
+# Determine percentage improvement
+mean((rel_eff_impr$rel_eff - rel_eff_impr$rel_eff_max_err) / rel_eff_impr$rel_eff_max_err) * 100
 
