@@ -20,7 +20,7 @@ Script: This folder contains the scripts to run the ABM and the analyses. The co
   * 4_ABM_sensory.R: simulations for naive forager accross different environmental parameters 
 * Analyses:
   * 10_Extract_Output.R: Script to analyse the ABM output
-  * 11_Analysis_UD50.R: Script to analyse the UD50 from the simulated movement
+  * 11_Analysis_UD50.R: Script to determine the UD50 from the simulated movement
 * Functions:
   * Functions.R: Script that contains functions that are being called upon by the ABM
 
