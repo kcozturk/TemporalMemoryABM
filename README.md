@@ -1,7 +1,8 @@
 # Temporal memory ABM
 
-This repository contains R code for an Agent-based Model (ABM) that is used to simulate a frugivorous primate with episodic memory abilities (that can vary in timing error and cognitive storage capacity) under different environmental conditions.
+This repository contains the R code to reproduce the Agent-based Model (ABM) and the analyses that belong to the manuscript "Quantity versus quality: When and where does temporal memory pay off when foraging?" by Kavel C. D. Ozturk 1, Bryndan O. C. M. van Pinxteren, Karline R. L. Janmaat, Benjamin Robira (2026).
 
 Script: This folder contains script to run the ABM and the analyses.
 
-Output: This folder contains the output from the ABM.
+The output from the ABM can be obtained from: ....
+
