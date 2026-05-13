@@ -160,7 +160,7 @@ averages_df3 <- compute_averages(
   sensory_avg = averages_df6
 )
 
-## Scenario 2 – tradeoff (linear)
+## Scenario 2 â tradeoff (linear)
 
 # df7: time_to_dis & memory_slots
 averages_df7 <- compute_averages(
@@ -186,7 +186,7 @@ averages_df9 <- compute_averages(
   sensory_avg = averages_df6
 )
 
-## Scenario 2 – tradeoff (exponential)
+## Scenario 2 â tradeoff (exponential)
 
 # df10: time_to_dis & memory_slots
 averages_df10 <- compute_averages(
@@ -212,7 +212,7 @@ averages_df12 <- compute_averages(
   sensory_avg = averages_df6
 )
 
-## Scenario 3 – nonupdate
+## Scenario 3 â nonupdate
 
 # df13: time_to_dis, memory_slots, inaccuracy_factor
 averages_df13 <- compute_averages(
@@ -263,7 +263,7 @@ for (nm in avg_names) {
 #===================================#
 
 #====================================#
-###### FIG. 2: Simulated output ######
+###### FIG. 1: Simulated output ######
 #====================================#
 
 
@@ -274,7 +274,7 @@ env_ymin <- 0
 env_ymax <- 1000
 
 # Output figure as PNG
-png(filename = "Fig2.png", width = 1100, height = 1200, units = "px", res = 160)
+png(filename = "Fig1.png", width = 1100, height = 1200, units = "px", res = 160)
 
 par(mfrow = c(4, 3), oma = c(1, 1, 1.5, 1), mar = c(2, 4.3, 2.2, 1), cex.lab = 1.3)
 set.seed(1)
@@ -1557,7 +1557,7 @@ figure4right <- annotate_figure(
 
 ### =====  FIG. 4: Combined the three figures side by side
 title_left <- text_grob("RIPE-FRUIT DURATION (tu):", size = 14)
-title_mid <- text_grob("RESOURCE DENSITY (×10^-6 trees/alu^2):", size = 14)
+title_mid <- text_grob("RESOURCE DENSITY (Ã10^-6 trees/alu^2):", size = 14)
 title_right <- text_grob("PATCH SPREAD (alu):", size = 14)
 
 
@@ -2272,7 +2272,7 @@ plotC <- ggplot(data = tradeoff_df3_vals[, ],
   )
 
 
-### --- Top Plot (A–C side by side) ---
+### --- Top Plot (AâC side by side) ---
 
 figure6_top <- ggarrange(
   plotA, plotB, plotC,
@@ -2439,7 +2439,7 @@ plotC <- ggplot(data = tradeoff_df15_vals[, ],
   )
 
 
-### --- Bottom Plot (D–F side by side) ---
+### --- Bottom Plot (DâF side by side) ---
 
 figure6_bot <- ggarrange(
   plotA, plotB, plotC,
@@ -2842,7 +2842,7 @@ plotC <- ggplot(data = max_rowS2,
   )
 
 
-### --- Top Plot (A–C side by side) ---
+### --- Top Plot (AâC side by side) ---
 
 figureS2_top <- ggarrange(
   plotA, plotB, plotC,
@@ -2955,7 +2955,7 @@ plotF <- ggplot(data = max_rows15,
   )
 
 
-### --- Bottom Plot (D–F side by side) ---
+### --- Bottom Plot (DâF side by side) ---
 
 figureS2_bot <- ggarrange(
   plotD, plotE, plotF,
@@ -3161,7 +3161,7 @@ plotC <- ggplot(data = averages_df9[, ],
   )
 
 
-### --- Top Plot (A–C side by side) ---
+### --- Top Plot (AâC side by side) ---
 
 figureS3_top <- ggarrange(
   plotA, plotB, plotC,
@@ -3289,7 +3289,7 @@ plotC <- ggplot(data = averages_df12[, ],
   )
 
 
-### --- Bottom Plot (D–F side by side) ---
+### --- Bottom Plot (DâF side by side) ---
 
 figureS3_bot <- ggarrange(
   plotA, plotB, plotC,
@@ -4239,7 +4239,7 @@ figureS4right <- annotate_figure(
 
 ### =====  FIG. S4: Combined the three figures side by side
 title_left <- text_grob("RIPE-FRUIT DURATION (tu):", size = 14)
-title_mid <- text_grob("RESOURCE DENSITY (×10^-6 trees/alu^2):", size = 14)
+title_mid <- text_grob("RESOURCE DENSITY (Ã10^-6 trees/alu^2):", size = 14)
 title_right <- text_grob("PATCH SPREAD (alu):", size = 14)
 
 
