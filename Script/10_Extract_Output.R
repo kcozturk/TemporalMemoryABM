@@ -263,7 +263,7 @@ for (nm in avg_names) {
 #===================================#
 
 #====================================#
-###### FIG. 1: Simulated output ######
+###### FIG. 2: Simulated output ######
 #====================================#
 
 
@@ -274,7 +274,7 @@ env_ymin <- 0
 env_ymax <- 1000
 
 # Output figure as PNG
-png(filename = "Fig1.png", width = 1100, height = 1200, units = "px", res = 160)
+png(filename = "Fig2.png", width = 1100, height = 1200, units = "px", res = 160)
 
 par(mfrow = c(4, 3), oma = c(1, 1, 1.5, 1), mar = c(2, 4.3, 2.2, 1), cex.lab = 1.3)
 set.seed(1)
@@ -737,7 +737,7 @@ for (i in seq_along(time_values)){
       plot.title = element_text(hjust = 0.5),
       plot.tag.position = c(0.07, 0.98),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing error", y = "Memory size",
          title = paste(t), tag = "A")
   
@@ -822,7 +822,7 @@ for (i in seq_along(time_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing error", 
          y = expression(paste("log(", italic(E)[r], ")")),
          tag = "B")
@@ -908,7 +908,7 @@ for (i in seq_along(time_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Memory size", 
          y = expression(paste("log(", italic(E)[r], ")")),
          tag = "C")
@@ -1026,7 +1026,7 @@ for (i in seq_along(nTree_values)){
       plot.title = element_text(hjust = 0.5),
       plot.tag.position = c(0.07, 0.98),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing error",
          title = paste(t), 
          tag = "D")
@@ -1111,7 +1111,7 @@ for (i in seq_along(nTree_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text() else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing error", 
          y = expression(paste("log(", italic(E)[r], ")")),
          tag = "E")
@@ -1197,7 +1197,7 @@ for (i in seq_along(nTree_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Memory size", y = expression(paste("log(", italic(E)[r], ")")),
          tag = "F")
   
@@ -1313,7 +1313,7 @@ for (i in seq_along(cent_std_values)){
       plot.title = element_text(hjust = 0.5),
       plot.tag.position = c(0.07, 0.98),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing Error",
          title = paste(t), tag = "G")
   
@@ -1397,7 +1397,7 @@ for (i in seq_along(cent_std_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text() else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing error",
          tag = "H")
   
@@ -1482,7 +1482,7 @@ for (i in seq_along(cent_std_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Memory size",
          tag = "I")
   
@@ -3424,7 +3424,7 @@ for (i in seq_along(time_values)){
       plot.title = element_text(hjust = 0.5),
       plot.tag.position = c(0.07, 0.98),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing error", y = "Memory size",
          title = paste(t), tag = "A")
   
@@ -3508,7 +3508,7 @@ for (i in seq_along(time_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing error", 
          y = expression(paste("log(", italic(E)[f], ")")),
          tag = "B")
@@ -3594,7 +3594,7 @@ for (i in seq_along(time_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Memory size", 
          y = expression(paste("log(", italic(E)[f], ")")),
          tag = "C")
@@ -3794,7 +3794,7 @@ for (i in seq_along(nTree_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text() else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing error", 
          y = expression(paste("log(", italic(E)[f], ")")),
          tag = "E")
@@ -3995,7 +3995,7 @@ for (i in seq_along(cent_std_values)){
       plot.title = element_text(hjust = 0.5),
       plot.tag.position = c(0.07, 0.98),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing Error",
          title = paste(t), tag = "G") 
   
@@ -4079,7 +4079,7 @@ for (i in seq_along(cent_std_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text() else element_blank()
-      ) +  
+    ) +  
     labs(x = "Timing error",
          tag = "H") 
   
@@ -4164,7 +4164,7 @@ for (i in seq_along(cent_std_values)) {
       axis.ticks = element_line(colour = "black"),
       plot.tag.position = c(0.07, 1.06),
       plot.tag = if (i == 1) element_text()  else element_blank()
-      ) +  
+    ) +  
     labs(x = "Memory size",
          tag = "I") 
   
@@ -4485,4 +4485,3 @@ rel_eff_impr <- data.frame(rel_eff = c(df_max$rel_eff,
 
 # Determine percentage improvement
 mean((rel_eff_impr$rel_eff - rel_eff_impr$rel_eff_max_err) / rel_eff_impr$rel_eff_max_err) * 100
-
